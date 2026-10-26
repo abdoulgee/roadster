@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="description" content="Drive Roadster — jump, flip, hover and boost through endless highway traffic." />
+    <title>Drive Roadster</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <canvas id="game"></canvas>
+
+    <!-- Covers the canvas only until the game is ready (see main.ts). -->
+    <div id="loading" class="loading">
+      <div class="loading-inner">
+        <h1><span>DRIVE</span><span>ROADSTER</span></h1>
+        <div class="loading-bar"><div id="loading-fill"></div></div>
+      </div>
+    </div>
+
+    <div id="hud" class="hidden">
+      <div class="hud-dist"><span id="hud-dist">0</span><small>m</small></div>
+      <div class="hud-score" id="hud-score">0</div>
+      <div id="hud-combo" class="hud-combo hidden">
+        <div class="combo-head">
+          <b id="combo-mult">×1</b><span>STREAK <span id="combo-count">1</span></span><em id="combo-score">+0</em>
+        </div>
+        <div class="combo-bar"><div id="combo-fill"></div></div>
+      </div>
+      <div id="hud-power" class="hud-power hidden">
+        <b id="power-name">STARMAN</b><span id="power-sub"></span>
+        <div class="power-bar"><div id="power-fill"></div></div>
+      </div>
+      <div id="zone-banner" class="zone-banner"></div>
+      <button id="btn-pause" class="icon-btn" tabindex="-1" aria-label="Pause">
+        <span>II</span><kbd>P</kbd>
+      </button>
+      <div id="popups" aria-live="polite"></div>
+      <div id="hud-air" class="hud-air">
+        <div class="rocket-head"><span>ROCKET</span><span id="hud-rocket-val">0%</span></div>
+        <div class="rocket-bar"><div id="hud-rocket-fill"></div></div>
+        <div class="air-head"><span>AIR</span><span id="hud-air-val">600 L</span></div>
+        <div class="air-bar"><div id="hud-air-fill"></div></div>
+      </div>
+      <div class="hud-slots">
+        <div id="hud-item" class="hud-item empty">
+          <img id="hud-item-icon" alt="" />
+          <div><b id="hud-item-name">NO ITEM</b><small><kbd>Z</kbd> to use</small></div>
+        </div>
+        <div id="hud-shield" class="hud-shield hidden">HEAT SHIELD</div>
+      </div>
+      <div class="touch-controls">
+        <!-- The game view takes one-thumb gestures (see Input.attachGestures); these only give feedback. -->
+        <div class="tc-edge left" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" /></svg></div>
+        <div class="tc-edge right" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" /></svg></div>
+        <div class="tc-guide" aria-hidden="true">
+          <span><b>← →</b>Swipe · lane</span>
+          <span><b>TAP</b>Jump</span>
+          <span><b>HOLD</b>Fly</span>
+          <span><b>↓</b>Swipe · slam</span>
+        </div>
+        <!-- Thumb dock: within reach of one thumb, whichever hand. -->
+        <div class="tc-dock">
+          <button class="touch-btn small item" data-touch="item" tabindex="-1" aria-label="Use item">
+            <svg viewBox="0 0 24 24"><path d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.4 6.7 19.4l1.2-6L3.4 9.3l6-.7z" /></svg>
+            <img class="tc-item-icon" alt="" />
+            <span>ITEM</span>
+          </button>
+          <button class="touch-btn boost" data-touch="boost" tabindex="-1" aria-label="Boost: hold, slide to change lane">
+            <i class="flick-hint l"></i><i class="flick-hint r"></i>
+            <span class="knob">
+              <svg viewBox="0 0 24 24"><path d="M13 3L5 14h6l-1 7 8-11h-6z" /></svg>
+              <span>BOOST</span>
+            </span>
+          </button>
+        </div>
+      </div>
+      <div class="hints">
+        <span><kbd>←</kbd><kbd>→</kbd> Lane / roll</span>
+        <span><kbd>↑</kbd><kbd>Space</kbd> Jump · hold to fly · again to flip</span>
+        <span><kbd>↓</kbd> Slam</span>
+        <span><kbd>Shift</kbd> Boost</span>
+        <span><kbd>Z</kbd> Item</span>
+        <span><kbd>P</kbd> Pause</span>
+      </div>
+    </div>
+
+    <button id="btn-mute" class="icon-btn mute-btn" tabindex="-1" aria-label="Toggle sound">
+      <svg class="mute-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path class="speaker" d="M4 9h4l5-4v14l-5-4H4z" />
+        <path class="wave" d="M16 9a4 4 0 010 6M18.5 6.5a7.5 7.5 0 010 11" />
+        <path class="cross" d="M16 9l5 6M21 9l-5 6" />
+      </svg>
+      <span id="mute-label">SOUND ON</span><kbd>M</kbd>
+    </button>
+
+    <section id="menu" class="screen">
+      <div class="menu-panel">
+        <p class="eyebrow">Endless highway stunt runner</p>
+        <h1><span>DRIVE</span><span>ROADSTER</span></h1>
+        <div class="pilot">
+          <span id="pilot-badge" class="pilot-badge" aria-hidden="true">P</span>
+          <div class="pilot-text">
+            <label>Pilot</label>
+            <b id="menu-pilot">Connecting pilot…</b>
+          </div>
+          <button id="btn-callsign" class="pilot-edit" tabindex="-1" aria-label="Change pilot name">
+            <svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16zM14 6l4 4" /></svg>
+          </button>
+        </div>
+        <p id="menu-challenge" class="challenge hidden"></p>
+        <div class="stats">
+          <div><label>Best score</label><b id="menu-best">—</b></div>
+          <div><label>Best distance</label><b id="menu-dist">—</b></div>
+        </div>
+        <div class="menu-buttons">
+          <button id="btn-play" class="btn primary play" tabindex="-1">
+            <svg viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z" /></svg>PLAY <kbd>SPACE</kbd>
+          </button>
+        </div>
+        <table class="controls">
+          <tr><td><kbd>←</kbd> <kbd>→</kbd></td><td>Change lane · barrel roll in the air</td></tr>
+          <tr><td><kbd>↑</kbd> / <kbd>Space</kbd></td><td>Jump · hold to fly · press again to flip</td></tr>
+          <tr><td><kbd>↓</kbd></td><td>Slam down</td></tr>
+          <tr><td><kbd>Shift</kbd></td><td>Boost</td></tr>
+          <tr><td><kbd>Z</kbd></td><td>Use item</td></tr>
+          <tr><td><kbd>P</kbd> · <kbd>M</kbd></td><td>Pause · sound</td></tr>
+        </table>
+        <p class="note">
+          Flying, flips and boost use AIR. It refills on the ground and from tricks. Chain flips, rolls,
+          clears and near misses into a streak to raise your multiplier. Grab air orbs to charge ROCKET
+          mode, and the golden star for STARMAN.
+        </p>
+        <p class="note touch-note">One thumb does it all: swipe left or right to change lane, tap or swipe up to jump (flips happen on their own), hold to fly and slide to steer, swipe down to slam. Hold BOOST to boost; slide it to change lane too.</p>
+      </div>
+      <!-- Garage: the arrows flank the orbiting car; the game positions this layer every frame. -->
+      <div id="garage" class="garage" aria-label="Choose your car">
+        <button id="btn-car-prev" class="garage-arrow prev" tabindex="-1" aria-label="Previous car">
+          <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" /></svg>
+        </button>
+        <button id="btn-car-next" class="garage-arrow next" tabindex="-1" aria-label="Next car">
+          <svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" /></svg>
+        </button>
+        <div class="garage-info">
+          <b id="car-name">Roadster</b>
+          <small id="car-tagline"></small>
+        </div>
+      </div>
+    </section>
+
+    <section id="pause" class="screen center hidden">
+      <div class="panel">
+        <h2>PAUSED</h2>
+        <button id="btn-resume" class="btn primary" tabindex="-1">Resume <kbd>P</kbd></button>
+        <button id="btn-pause-menu" class="btn" tabindex="-1">Main menu</button>
+      </div>
+    </section>
+
+    <section id="over" class="screen center hidden">
+      <div class="panel">
+        <p id="over-reason" class="reason">COLLISION</p>
+        <p id="over-record" class="record hidden">NEW RECORD</p>
+        <div id="over-score" class="big-score">0</div>
+        <p id="over-rank" class="rank-line"></p>
+        <p id="over-challenge" class="challenge hidden"></p>
+        <div class="run-stats">
+          <div><label>Distance</label><b id="over-dist">0 m</b></div>
+          <div><label>Time</label><b id="over-time">0:00</b></div>
+          <div><label>Max streak</label><b id="over-streak">0</b></div>
+          <div><label>Best</label><b id="over-best">0</b></div>
+        </div>
+        <button id="btn-retry" class="btn primary" tabindex="-1">Retry <kbd>SPACE</kbd></button>
+        <button id="btn-share" class="btn" tabindex="-1">Share</button>
+        <button id="btn-over-menu" class="btn" tabindex="-1">Menu</button>
+      </div>
+    </section>
+
+    <section id="callsign" class="screen center modal hidden">
+      <div class="panel">
+        <h2 id="callsign-title">PILOT NAME</h2>
+        <p id="callsign-text" class="note">2–12 characters: letters, numbers, _ - or .</p>
+        <div class="callsign-row">
+          <input id="callsign-input" maxlength="12" autocomplete="off" spellcheck="false" placeholder="Your name" aria-label="Pilot name" />
+          <button id="btn-callsign-random" class="btn" tabindex="-1">Random</button>
+        </div>
+        <p id="callsign-error" class="form-error" role="alert"></p>
+        <button id="btn-callsign-save" class="btn primary" tabindex="-1">Save</button>
+        <button id="btn-callsign-cancel" class="btn" tabindex="-1">Cancel</button>
+      </div>
+    </section>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

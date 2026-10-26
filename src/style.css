@@ -1,0 +1,1630 @@
+:root {
+  --ink: #f6f1ea;
+  --ink-dim: rgba(246, 241, 234, 0.62);
+  --panel: rgba(14, 12, 22, 0.62);
+  --panel-line: rgba(255, 255, 255, 0.14);
+  --accent: #ff3b4e;
+  --air: #8fe3ff;
+  --air-low: #ff6a3d;
+  --gold: #ffc640;
+  --rocket: #ff9a3d;
+  /* Solid surfaces for the menus (no glass): darkest to lightest, and their dividing line. */
+  --surface: #111116;
+  --surface-2: #1a1a21;
+  --surface-3: #25252e;
+  --line: #30303b;
+  /* Cut corners: the menus' panels and buttons have two corners clipped off at 45°. */
+  --cut: 12px;
+  --font-ui: 'Chakra Petch', system-ui, sans-serif;
+  --font-num: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  touch-action: none;
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #0b0a10;
+  color: var(--ink);
+  font-family: var(--font-ui);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#game {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  transition: filter 0.6s ease;
+}
+
+#game.crashed {
+  filter: grayscale(1) contrast(1.08) brightness(0.85);
+}
+
+.hidden {
+  display: none !important;
+}
+
+kbd {
+  display: inline-block;
+  min-width: 1.6em;
+  padding: 0.1em 0.4em;
+  border: 1px solid #3c3c48;
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  font-family: var(--font-num);
+  font-size: 0.72em;
+  text-align: center;
+  color: var(--ink);
+  background: var(--surface-3);
+}
+
+/* ---------- HUD ---------- */
+
+#hud {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+}
+
+#hud.dimmed .hints,
+#hud.dimmed .mute-btn {
+  position: fixed;
+  right: 20px;
+  z-index: 5;
+}
+
+.mute-btn.muted {
+  color: var(--ink-dim);
+}
+
+.mute-icon {
+  display: none;
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.mute-icon .speaker {
+  fill: currentColor;
+}
+
+.mute-btn.muted .wave,
+.mute-btn:not(.muted) .cross {
+  display: none;
+}
+
+.hud-combo {
+  position: absolute;
+  top: 66px;
+  left: 50%;
+  width: 240px;
+  transform: translateX(-50%);
+  text-align: center;
+}
+
+.combo-head {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  justify-content: center;
+  font-size: 13px;
+  letter-spacing: 0.14em;
+}
+
+.combo-head b {
+  font-family: var(--font-num);
+  font-size: 22px;
+  color: var(--gold);
+}
+
+.combo-head em {
+  font-family: var(--font-num);
+  font-style: normal;
+  color: var(--gold);
+}
+
+.combo-bar {
+  height: 3px;
+  margin-top: 4px;
+  border-radius: 2px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+#combo-fill {
+  height: 100%;
+  background: var(--gold);
+  transform-origin: center;
+}
+
+.hud-combo.bump b {
+  animation: bump 0.25s ease-out;
+}
+
+@keyframes bump {
+  40% {
+    transform: scale(1.35);
+  }
+}
+
+#popups {
+  opacity: 0;
+}
+
+.hud-dist {
+  position: absolute;
+  top: 18px;
+  left: 22px;
+  font-family: var(--font-num);
+  font-size: 30px;
+  font-weight: 700;
+}
+
+.hud-dist small {
+  margin-left: 4px;
+  font-size: 15px;
+  color: var(--ink-dim);
+}
+
+.hud-score {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-num);
+  font-size: 40px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.icon-btn {
+  position: absolute;
+  top: 18px;
+  right: 150px;
+  pointer-events: auto;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 0;
+  background: var(--surface);
+  color: var(--ink);
+  font: 700 14px var(--font-ui);
+  cursor: pointer;
+}
+
+.mute-btn {
+  position: fixed;
+  right: 20px;
+  z-index: 5;
+}
+
+.mute-btn.muted {
+  color: var(--ink-dim);
+}
+
+.hud-combo {
+  position: absolute;
+  top: 66px;
+  left: 50%;
+  width: 240px;
+  transform: translateX(-50%);
+  text-align: center;
+}
+
+.combo-head {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  justify-content: center;
+  font-size: 13px;
+  letter-spacing: 0.14em;
+}
+
+.combo-head b {
+  font-family: var(--font-num);
+  font-size: 22px;
+  color: var(--gold);
+}
+
+.combo-head em {
+  font-family: var(--font-num);
+  font-style: normal;
+  color: var(--gold);
+}
+
+.combo-bar {
+  height: 3px;
+  margin-top: 4px;
+  border-radius: 2px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+#combo-fill {
+  height: 100%;
+  background: var(--gold);
+  transform-origin: center;
+}
+
+.hud-combo.bump b {
+  animation: bump 0.25s ease-out;
+}
+
+@keyframes bump {
+  40% {
+    transform: scale(1.35);
+  }
+}
+
+#popups {
+  position: absolute;
+  top: 26%;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  transition: opacity 0.2s;
+}
+
+.popup {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  animation: popup 1.15s ease-out forwards;
+}
+
+.popup b {
+  font-family: var(--font-num);
+  font-size: 0.85em;
+  color: var(--gold);
+}
+
+.popup i {
+  font-family: var(--font-num);
+  font-size: 0.6em;
+  font-style: normal;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--gold);
+  color: #1c1400;
+  text-shadow: none;
+}
+
+.popup.great span {
+  color: var(--gold);
+  font-size: 1.15em;
+}
+
+.popup.warn span {
+  color: var(--ink-dim);
+}
+
+@keyframes popup {
+  0% {
+    opacity: 0;
+    transform: translateY(12px) scale(0.85);
+  }
+  15% {
+    opacity: 1;
+    transform: translateY(0) scale(1.06);
+  }
+  25% {
+    transform: scale(1);
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-26px);
+  }
+}
+
+.hud-air {
+  position: absolute;
+  bottom: 44px;
+  left: 50%;
+  width: min(420px, calc(100% - 32px));
+  transform: translateX(-50%);
+}
+
+.air-head {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+  font-family: var(--font-num);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  color: var(--ink-dim);
+}
+
+.air-bar {
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--panel-line);
+}
+
+#hud-air-fill {
+  height: 100%;
+  background: var(--air);
+  box-shadow: 0 0 12px var(--air);
+  transform-origin: left;
+  transition: background 0.2s;
+}
+
+.hud-air.low #hud-air-fill {
+  background: var(--air-low);
+  box-shadow: 0 0 12px var(--air-low);
+}
+
+.hud-air.low .air-head {
+  color: var(--air-low);
+}
+
+#hud::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  box-shadow: inset 0 0 140px 30px rgba(255, 70, 40, 0.55);
+  transition: opacity 0.25s;
+}
+
+#hud.boosting::after {
+  opacity: 1;
+}
+
+.hints {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 18px;
+  font-size: 12px;
+  color: var(--ink-dim);
+  white-space: nowrap;
+  transition: opacity 0.2s;
+}
+
+/* ---------- Screens ---------- */
+
+.screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+}
+
+.screen.center {
+  justify-content: center;
+  background: rgba(6, 6, 10, 0.55);
+}
+
+/* Home: a solid sidebar down the left with a red edge; the garage car fills the rest of the screen. */
+#menu {
+  align-items: stretch;
+}
+
+.menu-panel {
+  display: flex;
+  flex-direction: column;
+  width: min(470px, 44vw);
+  padding: clamp(24px, 6vh, 60px) clamp(24px, 3.4vw, 52px);
+  overflow-y: auto;
+  border-right: 3px solid var(--accent);
+  background: linear-gradient(180deg, var(--surface) 0%, #0b0b0f 100%);
+  box-shadow: 18px 0 60px rgba(0, 0, 0, 0.45);
+}
+
+/* Centred vertically when it fits, scrolling from the top when it doesn't (plain centring would cut the top off). */
+.menu-panel > :first-child {
+  margin-top: auto;
+}
+
+.menu-panel > :last-child {
+  margin-bottom: auto;
+}
+
+.menu-panel h1 {
+  font-size: clamp(40px, 4.8vw, 74px);
+}
+
+.eyebrow {
+  margin: 0 0 6px;
+  font-size: 13px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+h1 {
+  display: flex;
+  flex-direction: column;
+  margin: 0 0 22px;
+  font-size: clamp(48px, 8vw, 92px);
+  line-height: 0.92;
+  letter-spacing: 0.06em;
+}
+
+h1 span:last-child {
+  color: transparent;
+  -webkit-text-stroke: 2px var(--ink);
+}
+
+.run-stats {
+  display: flex;
+  gap: 28px;
+  margin-bottom: 22px;
+}
+
+/* Best score / distance as two solid tiles. */
+.stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.stats > div {
+  padding: 10px 14px 12px;
+  border-top: 2px solid var(--line);
+  background: var(--surface-2);
+}
+
+.stats label,
+.run-stats label {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.stats b,
+.run-stats b {
+  font-family: var(--font-num);
+  font-size: 20px;
+}
+
+.btn {
+  display: inline-flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 26px;
+  border: none;
+  background: var(--surface-3);
+  color: var(--ink);
+  font: 700 17px var(--font-ui);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+  clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut));
+  transition: transform 0.12s, background 0.12s, color 0.12s;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+  background: #30303b;
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn.primary {
+  background: var(--accent);
+  color: #fff;
+}
+
+.btn.primary:hover {
+  background: #ff5466;
+}
+
+.btn.primary kbd {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.45);
+  background: rgba(0, 0, 0, 0.18);
+}
+
+/* The big PLAY button on the home screen. */
+.btn.play {
+  width: 100%;
+  padding: 18px 26px;
+  font-size: 24px;
+  letter-spacing: 0.22em;
+}
+
+.btn.play svg {
+  width: 22px;
+  height: 22px;
+  fill: currentColor;
+}
+
+.controls {
+  margin-top: 24px;
+  border-collapse: collapse;
+  font-size: 14px;
+  color: var(--ink-dim);
+}
+
+.controls td {
+  padding: 4px 14px 4px 0;
+}
+
+.note {
+  max-width: 380px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-dim);
+}
+
+/* Pause, game over and the name prompt: solid cards with a red top edge and cut corners. */
+.panel {
+  --cut: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  min-width: min(380px, calc(100vw - 32px));
+  max-width: calc(100vw - 32px);
+  padding: 30px 32px 28px;
+  background: linear-gradient(180deg, var(--surface-2) 0%, var(--surface) 100%);
+  box-shadow: inset 0 3px 0 var(--accent);
+  clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut));
+}
+
+.panel h2 {
+  margin: 0 0 8px;
+  letter-spacing: 0.2em;
+}
+
+.panel .btn {
+  --cut: 10px;
+}
+
+.panel .btn {
+  width: 100%;
+}
+
+.reason {
+  margin: 0;
+  font-size: 13px;
+  letter-spacing: 0.25em;
+  color: var(--accent);
+}
+
+.record {
+  margin: 0;
+  padding: 3px 10px;
+  border-radius: 4px;
+  background: var(--gold);
+  color: #1c1400;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+}
+
+.big-score {
+  font-family: var(--font-num);
+  font-size: 56px;
+  font-weight: 700;
+}
+
+.run-stats {
+  margin-bottom: 8px;
+}
+
+.rocket-head {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 3px;
+  font-family: var(--font-num);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--rocket);
+}
+
+.rocket-bar {
+  height: 4px;
+  margin-bottom: 8px;
+  border-radius: 2px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+#hud-rocket-fill {
+  height: 100%;
+  background: var(--rocket);
+  box-shadow: 0 0 10px var(--rocket);
+  transform: scaleX(0);
+  transform-origin: left;
+}
+
+.hud-slots {
+  position: absolute;
+  left: 22px;
+  bottom: 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hud-item {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 12px 6px 6px;
+  border: 1px solid var(--panel-line);
+  border-radius: 10px;
+  background: var(--panel);
+}
+
+.hud-item img {
+  width: 42px;
+  height: 42px;
+}
+
+.hud-item b {
+  display: block;
+  font-size: 14px;
+  letter-spacing: 0.1em;
+}
+
+.hud-item small {
+  font-size: 11px;
+  color: var(--ink-dim);
+}
+
+.hud-item.empty {
+  opacity: 0.45;
+}
+
+.hud-item.empty img {
+  visibility: hidden;
+}
+
+.hud-item.fresh {
+  animation: bump 0.35s ease-out;
+}
+
+.hud-shield {
+  align-self: flex-start;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: rgba(255, 154, 61, 0.2);
+  border: 1px solid #ff9a3d;
+  color: #ffb06b;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+}
+
+.hud-power {
+  position: absolute;
+  top: 112px;
+  left: 50%;
+  width: 300px;
+  transform: translateX(-50%);
+  text-align: center;
+  --power: var(--gold);
+}
+
+.hud-power b {
+  display: block;
+  font-size: 26px;
+  letter-spacing: 0.16em;
+  color: var(--power);
+}
+
+.hud-power span {
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  color: var(--ink-dim);
+}
+
+.power-bar {
+  height: 4px;
+  margin-top: 6px;
+  border-radius: 2px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+#power-fill {
+  height: 100%;
+  background: var(--power);
+  box-shadow: 0 0 10px var(--power);
+  transform-origin: left;
+}
+
+.zone-banner {
+  position: absolute;
+  top: 40%;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: clamp(28px, 5vw, 54px);
+  font-weight: 700;
+  letter-spacing: 0.4em;
+  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.55);
+  opacity: 0;
+}
+
+.zone-banner.show {
+  animation: zone 2.6s ease-out forwards;
+}
+
+@keyframes zone {
+  0% {
+    opacity: 0;
+    letter-spacing: 0.7em;
+  }
+  20%,
+  70% {
+    opacity: 0.9;
+    letter-spacing: 0.4em;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.touch-controls,
+.touch-note {
+  display: none;
+}
+
+/* ---------- Touch devices ---------- */
+
+.touch {
+  --safe-l: max(14px, env(safe-area-inset-left));
+  --safe-r: max(14px, env(safe-area-inset-right));
+  --safe-b: max(14px, env(safe-area-inset-bottom));
+  --safe-t: max(12px, env(safe-area-inset-top));
+}
+
+/* One-hand layout: the game view takes swipes, taps and holds anywhere; the only buttons sit in a
+   small dock where a thumb rests. Portrait: centred, reachable by either thumb. Landscape: bottom right. */
+.touch .touch-controls {
+  position: absolute;
+  left: var(--safe-l);
+  right: var(--safe-r);
+  bottom: calc(var(--safe-b) + var(--tc-lift));
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+}
+
+.tc-dock {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+@media (orientation: landscape) {
+  .touch .touch-controls {
+    justify-content: flex-end;
+  }
+}
+
+.touch .touch-note {
+  display: block;
+}
+
+.touch .hints,
+.touch .controls,
+.touch .menu-panel > .note:not(.touch-note),
+.touch kbd {
+  display: none;
+}
+
+.touch {
+  --btn-small: clamp(56px, 16vw, 70px);
+  --btn-main: clamp(88px, 27vw, 112px);
+  --tc-lift: clamp(28px, 9vh, 96px);
+}
+
+@media (orientation: landscape) {
+  .touch {
+    --btn-small: clamp(50px, 14vh, 64px);
+    --btn-main: clamp(80px, 25vh, 104px);
+    --tc-lift: clamp(14px, 6vh, 48px);
+  }
+}
+
+/* Lane feedback: a glow up the edge of the screen on the side a swipe moved to. */
+.tc-edge {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  width: 24%;
+  color: var(--air);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.tc-edge.left {
+  left: 0;
+  padding-left: var(--safe-l);
+  background: linear-gradient(90deg, rgba(143, 227, 255, 0.22), transparent 60%);
+}
+
+.tc-edge.right {
+  right: 0;
+  justify-content: flex-end;
+  padding-right: var(--safe-r);
+  background: linear-gradient(270deg, rgba(143, 227, 255, 0.22), transparent 60%);
+}
+
+.tc-edge svg {
+  width: 40px;
+  height: 40px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 8px rgba(143, 227, 255, 0.8));
+}
+
+.tc-edge.flash {
+  animation: edge-flash 0.35s ease-out;
+}
+
+@keyframes edge-flash {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* How the gestures work, shown for the first seconds of each run. */
+.tc-guide {
+  position: fixed;
+  left: 50%;
+  top: 56%;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  width: min(92vw, 520px);
+  opacity: 0;
+  pointer-events: none;
+  translate: -50% 0;
+}
+
+.tc-guide span {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 7px 12px;
+  background: rgba(10, 10, 14, 0.72);
+  font: 600 12px var(--font-ui);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.tc-guide b {
+  color: var(--air);
+  font-family: var(--font-num);
+  letter-spacing: 0;
+}
+
+.touch-controls.hint .tc-guide {
+  animation: guide 5s ease-out;
+}
+
+@keyframes guide {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  8%,
+  80% {
+    opacity: 1;
+  }
+}
+
+@media (orientation: landscape) {
+  .tc-guide {
+    top: 30%;
+  }
+}
+
+.touch-btn {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: center;
+  justify-content: center;
+  width: var(--btn-small);
+  height: var(--btn-small);
+  padding: 0;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.22);
+  background: radial-gradient(circle at 50% 35%, rgba(255, 255, 255, 0.14), rgba(14, 12, 22, 0.55) 70%);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  color: var(--ink);
+  font: 700 10px var(--font-ui);
+  letter-spacing: 0.12em;
+  pointer-events: auto;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.08s, background 0.08s, border-color 0.08s;
+}
+
+.touch-btn svg {
+  width: 26px;
+  height: 26px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+
+.touch-btn.small svg {
+  width: 20px;
+  height: 20px;
+}
+
+.touch-btn.item {
+  opacity: 0.5;
+}
+
+.touch-btn.item.ready {
+  opacity: 1;
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+.tc-item-icon {
+  display: none;
+  width: 60%;
+  height: 60%;
+}
+
+.touch-btn.item.ready .tc-item-icon {
+  display: block;
+}
+
+.touch-btn.item.ready svg,
+.touch-btn.item.ready span {
+  display: none;
+}
+
+/* BOOST: the big dock button. Hold to boost; it is also a stick (slide for lanes, flick down to slam). */
+.touch-btn.boost {
+  position: relative;
+  width: var(--btn-main);
+  height: var(--btn-main);
+  border-color: rgba(255, 154, 61, 0.6);
+  color: #ffb06b;
+  font-size: 11px;
+}
+
+.touch-btn.boost svg {
+  width: 32px;
+  height: 32px;
+  fill: currentColor;
+  stroke-width: 1.5;
+}
+
+.touch-btn.boost .knob {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  transform: translateX(var(--knob, 0px));
+  transition: transform 0.06s;
+}
+
+.flick-hint {
+  position: absolute;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  border: solid currentColor;
+  border-width: 0 0 2px 2px;
+  opacity: 0.5;
+  translate: 0 -50%;
+}
+
+.flick-hint.l {
+  left: 10px;
+  rotate: 45deg;
+}
+
+.flick-hint.r {
+  right: 10px;
+  rotate: -135deg;
+}
+
+.touch-btn.boost.flick-l .flick-hint.l,
+.touch-btn.boost.flick-r .flick-hint.r {
+  animation: flick-pop 0.3s ease-out;
+}
+
+@keyframes flick-pop {
+  from {
+    opacity: 1;
+    scale: 1.8;
+  }
+  to {
+    opacity: 0.5;
+    scale: 1;
+  }
+}
+
+.touch-btn.item svg {
+  fill: currentColor;
+  stroke-width: 1.5;
+}
+
+.touch-btn.active {
+  transform: scale(0.92);
+  background: rgba(255, 255, 255, 0.28);
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+.touch-btn.boost.active {
+  background: rgba(255, 106, 61, 0.5);
+  border-color: var(--air-low);
+}
+
+/* HUD around the controls */
+.touch .hud-dist {
+  top: var(--safe-t);
+  left: var(--safe-l);
+  font-size: 24px;
+}
+
+.touch .hud-score {
+  top: calc(var(--safe-t) - 2px);
+  font-size: 30px;
+}
+
+.touch .icon-btn {
+  top: var(--safe-t);
+  padding: 7px 10px;
+  font-size: 11px;
+}
+
+.touch .mute-btn {
+  top: var(--safe-t);
+  right: var(--safe-r);
+}
+
+.touch .icon-btn {
+  min-width: 38px;
+  height: 34px;
+  justify-content: center;
+}
+
+.touch #mute-label {
+  display: none;
+}
+
+.touch .mute-icon {
+  display: block;
+}
+
+.touch #btn-pause {
+  right: calc(var(--safe-r) + 46px);
+}
+
+.touch .hud-power {
+  width: min(300px, 80vw);
+}
+
+.touch .hud-power b {
+  font-size: 20px;
+}
+
+.touch .hud-slots {
+  left: var(--safe-l);
+  bottom: auto;
+}
+
+/* The ITEM button shows the held item, so the slot only carries the shield badge. */
+.touch .hud-item {
+  display: none;
+}
+
+/* Portrait: meters go to the top, clear of the car and the thumbs. */
+.touch .hud-air {
+  top: calc(var(--safe-t) + 44px);
+  bottom: auto;
+  width: calc(100% - var(--safe-l) - var(--safe-r));
+}
+
+.touch .hud-slots {
+  top: calc(var(--safe-t) + 96px);
+}
+
+.touch .hud-combo {
+  top: calc(var(--safe-t) + 100px);
+}
+
+.touch .hud-power {
+  top: calc(var(--safe-t) + 146px);
+}
+
+.touch .popup {
+  font-size: 19px;
+}
+
+@media (orientation: landscape) {
+  .touch .hud-air {
+    top: auto;
+    bottom: calc(var(--safe-b) + 4px);
+    width: min(320px, calc(100% - 2 * var(--safe-l) - 2 * (var(--btn-main) + var(--btn-small) + 40px)));
+  }
+  .touch .hud-slots {
+    top: calc(var(--safe-t) + 40px);
+  }
+  .touch .hud-combo {
+    top: calc(var(--safe-t) + 44px);
+  }
+  .touch .hud-power {
+    top: calc(var(--safe-t) + 92px);
+  }
+  .touch #popups {
+    top: 22%;
+  }
+}
+
+/* Pilot card: a badge with the name's initials, the name, and an edit button. */
+.pilot {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin: -6px 0 16px;
+  padding: 10px 10px 10px 12px;
+  border-left: 3px solid var(--accent);
+  background: var(--surface-2);
+}
+
+.pilot-badge {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 42px;
+  height: 42px;
+  background: var(--accent);
+  color: #fff;
+  font: 700 16px var(--font-num);
+  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+}
+
+.pilot-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.pilot label {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.pilot b {
+  display: block;
+  overflow: hidden;
+  font-family: var(--font-num);
+  font-size: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pilot-edit {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border: none;
+  background: var(--surface-3);
+  color: var(--ink);
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.pilot-edit:hover {
+  background: var(--accent);
+}
+
+.pilot-edit svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.link-btn {
+  padding: 2px 6px;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font: 600 13px var(--font-ui);
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+
+.link-btn:hover {
+  text-decoration: underline;
+}
+
+.menu-buttons,
+.button-row {
+  display: flex;
+  gap: 10px;
+}
+
+.button-row {
+  width: 100%;
+}
+
+.button-row .btn {
+  flex: 1;
+}
+
+.challenge {
+  margin: 0 0 14px;
+  padding: 8px 12px;
+  border-left: 3px solid var(--gold);
+  background: rgba(255, 198, 64, 0.12);
+  font-size: 14px;
+}
+
+.panel .challenge {
+  margin: 0;
+}
+
+.rank-line {
+  margin: 0;
+  min-height: 1.2em;
+  font-size: 14px;
+  color: var(--ink-dim);
+  text-align: center;
+}
+
+.modal {
+  z-index: 10;
+  background: rgba(6, 6, 10, 0.78);
+}
+
+.callsign-row {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.callsign-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 0;
+  outline: none;
+  background: var(--surface);
+  color: var(--ink);
+  font: 600 18px var(--font-num);
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.callsign-row input:focus {
+  border-color: var(--accent);
+}
+
+.callsign-row input::placeholder {
+  color: rgba(246, 241, 234, 0.35);
+}
+
+.panel .callsign-row .btn {
+  flex: none;
+  width: auto;
+  padding: 10px 14px;
+  font-size: 14px;
+}
+
+.form-error {
+  min-height: 1.2em;
+  margin: 0;
+  font-size: 13px;
+  color: var(--accent);
+}
+
+@media (max-width: 720px) {
+  .hints,
+  .controls {
+    display: none;
+  }
+  .hud-score {
+    font-size: 30px;
+  }
+}
+
+/* ---------- Small screens ---------- */
+
+@media (max-width: 720px), (max-height: 680px) {
+  .panel {
+    padding: 20px 22px;
+    gap: 10px;
+  }
+  .big-score {
+    font-size: 44px;
+  }
+  .run-stats {
+    gap: 16px;
+  }
+}
+
+/* Portrait phones: the car is framed in the top half, the menu sits underneath it. */
+@media (orientation: portrait) and (max-width: 720px) {
+  /* The sidebar becomes a solid sheet across the bottom, with the red edge on top. */
+  #menu {
+    flex-direction: column;
+    justify-content: flex-end;
+  }
+  .menu-panel {
+    width: 100%;
+    max-height: 64%;
+    padding: 20px 20px max(20px, env(safe-area-inset-bottom));
+    border-right: none;
+    border-top: 3px solid var(--accent);
+    box-shadow: 0 -18px 60px rgba(0, 0, 0, 0.45);
+  }
+  .menu-panel h1 {
+    flex-direction: row;
+    gap: 0.3em;
+    margin-bottom: 14px;
+    font-size: clamp(30px, 10vw, 48px);
+  }
+  .stats {
+    margin-bottom: 16px;
+  }
+  .eyebrow,
+  .touch .touch-note {
+    display: none;
+  }
+}
+
+/* Landscape phones: short screens get a compact menu column. */
+@media (orientation: landscape) and (max-height: 680px) {
+  .menu-panel {
+    width: min(400px, 46vw);
+    padding: 14px 22px;
+    justify-content: flex-start;
+  }
+  .menu-panel h1 {
+    flex-direction: row;
+    gap: 0.3em;
+    margin-bottom: 10px;
+    font-size: clamp(24px, 6.5vh, 34px);
+  }
+  .pilot {
+    margin-bottom: 10px;
+    padding: 6px 8px 6px 10px;
+  }
+  .pilot-badge {
+    width: 34px;
+    height: 34px;
+    font-size: 13px;
+  }
+  .stats > div {
+    padding: 6px 10px 8px;
+  }
+  .btn.play {
+    padding: 12px 20px;
+    font-size: 19px;
+  }
+  .eyebrow {
+    font-size: 11px;
+  }
+  .stats {
+    margin-bottom: 12px;
+  }
+  .btn {
+    padding: 10px 20px;
+    font-size: 16px;
+  }
+  .note {
+    font-size: 12px;
+  }
+}
+
+/* ---------- Garage (car picker) ---------- */
+
+/* A layer over the 3D view: Game.frameGarage() feeds it the car's screen position every frame. */
+.garage {
+  --cx: 70vw;
+  --cy: 50vh;
+  --half: 160px;
+  --info-y: 65vh;
+  --arrow: 56px;
+  --gap: 14px;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.garage-arrow {
+  position: absolute;
+  top: var(--cy);
+  display: grid;
+  place-items: center;
+  width: var(--arrow);
+  height: var(--arrow);
+  border: none;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  pointer-events: auto;
+  touch-action: manipulation;
+  translate: 0 -50%;
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+  transition: background 0.12s, transform 0.12s, border-color 0.12s;
+}
+
+/* Either side of the car, kept on screen. */
+.garage-arrow.prev {
+  left: max(var(--min-left, 12px), calc(var(--cx) - var(--half) - var(--gap) - var(--arrow)));
+}
+
+.garage-arrow.next {
+  left: min(calc(100% - 12px - var(--arrow)), calc(var(--cx) + var(--half) + var(--gap)));
+}
+
+.garage-arrow:hover {
+  background: var(--accent);
+}
+
+.garage-arrow:active {
+  transform: scale(0.9);
+}
+
+.garage-arrow svg {
+  width: 26px;
+  height: 26px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.garage-arrow.prev svg {
+  margin-right: 3px;
+}
+
+.garage-arrow.next svg {
+  margin-left: 3px;
+}
+
+/* The caption sits under the car, centred on it: just the name and a line about it, no box. */
+.garage-info {
+  position: absolute;
+  left: var(--info-x, var(--cx));
+  top: var(--info-y);
+  translate: -50% 0;
+  max-width: calc(100% - 24px);
+  text-align: center;
+  white-space: nowrap;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.7), 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+.garage-info b {
+  display: block;
+  font-size: clamp(26px, 3.4vw, 38px);
+  letter-spacing: 0.08em;
+  line-height: 1.1;
+}
+
+.garage-info small {
+  display: block;
+  margin-top: 2px;
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  color: var(--ink-dim);
+}
+
+.garage-info.swap b {
+  animation: bump 0.3s ease-out;
+}
+
+@media (max-width: 720px), (max-height: 680px) {
+  .garage {
+    --arrow: 46px;
+    --gap: 6px;
+  }
+  .garage-info b {
+    font-size: 26px;
+  }
+  .garage-info small {
+    font-size: 12px;
+  }
+}
+
+/* ---------- Loading screen ---------- */
+
+.loading {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--surface);
+}
+
+.loading-inner {
+  width: min(360px, 100%);
+}
+
+.loading h1 {
+  margin-bottom: 24px;
+  font-size: clamp(40px, 11vw, 64px);
+}
+
+/* No real progress to report, so a light sweeps along the bar while the game gets ready. */
+.loading-bar {
+  height: 3px;
+  overflow: hidden;
+  background: var(--surface-3);
+}
+
+#loading-fill {
+  width: 35%;
+  height: 100%;
+  background: var(--accent);
+  animation: loading-sweep 1s ease-in-out infinite;
+}
+
+@keyframes loading-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
+  }
+}

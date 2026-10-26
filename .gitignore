@@ -1,0 +1,14 @@
+node_modules
+dist
+.env.local
+.env.*.local
+
+# Reference samples (images and videos) used while designing; not part of the game
+*.mp4
+*.webm
+*.mov
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.gif
