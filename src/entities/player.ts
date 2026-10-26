@@ -329,6 +329,8 @@ export class Player {
   slam() {
     if (this.crashed || this.grounded) return;
     this.vy = PHYS.slamSpeed;
+    // A slam is a dive: no automatic flip afterwards to throw the car back up.
+    this.autoFlipped = true;
     this.spend(AIR.slam);
     this.events.push({ type: 'thrust', kind: 'slam', dir: 0 });
     if (this.trick) {

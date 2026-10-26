@@ -20,7 +20,7 @@ import { Traffic, warmTrafficModels, type TrafficEvent, type Vehicle } from './e
 import { Effects } from './fx/effects';
 import { Post } from './fx/post';
 import { Weather } from './fx/weather';
-import { createLeaderboard, type Pilot, type RankInfo, type RunReport } from './online';
+import { createLeaderboard, type Pilot, type RunReport } from './online';
 import { readChallenge, shareRun } from './online/share';
 import { loadJSON, saveJSON } from './storage';
 import { Combo } from './systems/combo';
@@ -695,12 +695,11 @@ export class Game {
     };
     saveJSON(STORAGE_KEY, this.records);
     this.setState('over');
-    this.hud.setLine('over-rank', this.board.online ? 'Saving your score…' : '');
+    this.hud.setLine('over-rank', '');
     this.hud.setLine('over-challenge', this.challengeLine(score));
     void this.submitRun({ distance: this.distance, score, duration: this.runTime, maxStreak: this.maxStreak });
     this.hud.showGameOver({
       score,
-      maxStreak: this.maxStreak,
       distance: this.distance,
       time: this.runTime,
       best: this.records.bestScore,
@@ -711,28 +710,14 @@ export class Game {
 
   // ---------- online ----------
 
+  /** Saves the run in the background; the game-over card doesn't show where it ranks. */
   private async submitRun(report: RunReport) {
-    const ticket = this.runTicket;
     try {
-      const runId = await ticket;
-      if (!runId) throw new Error('run not started');
-      const rank = await this.board.submitRun(runId, report);
-      if (ticket === this.runTicket && this.state === 'over') this.hud.setLine('over-rank', this.rankLine(rank));
+      const runId = await this.runTicket;
+      if (runId) await this.board.submitRun(runId, report);
     } catch {
-      if (ticket === this.runTicket && this.state === 'over') {
-        this.hud.setLine('over-rank', this.board.online ? 'Could not save your online score.' : '');
-      }
+      // A score that couldn't be saved online is simply skipped.
     }
-  }
-
-  private rankLine(rank: RankInfo | null) {
-    if (!rank) return '';
-    const where = this.board.online ? `Rank #${rank.rank} of ${rank.total}` : `Run #${rank.rank} of ${rank.total} on this device`;
-    if (!rank.ahead) return `${where} · You're on top!`;
-    const gap = rank.ahead.value - rank.value + 1;
-    return this.board.online
-      ? `${where} · ${gap.toLocaleString()} pts to #${rank.ahead.rank} ${rank.ahead.callsign}`
-      : `${where} · ${gap.toLocaleString()} pts to your best`;
   }
 
   private challengeLine(score: number) {

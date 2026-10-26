@@ -1,10 +1,10 @@
 export type Action = 'left' | 'right' | 'jump' | 'down' | 'boost' | 'item' | 'pause' | 'confirm' | 'mute';
 export type TouchAction = 'left' | 'right' | 'jump' | 'down' | 'boost' | 'item';
 
-// One-thumb gestures on the game view (see attachGestures).
+// Gestures on the game view (see attachGestures).
 /** Travel (px) that turns a touch into a swipe; a long sideways drag changes lane again every SWIPE_PX. */
 const SWIPE_PX = 34;
-/** A finger that stays put this long (ms) is a hold: jump, then fly for as long as it stays down. */
+/** A finger that stays put this long (ms) is a hold: it boosts for as long as it stays down. */
 const HOLD_MS = 170;
 /** Movement (px) a hold or a tap may wobble by and still count as one. */
 const STILL_PX = 14;
@@ -93,12 +93,12 @@ export class Input {
   }
 
   /**
-   * One-thumb gestures on `el` (the game view), so the whole game plays with one hand:
+   * Gestures on `el` (the game view); the JUMP stick on the right handles jumping and flying:
    * - swipe left / right: change lane; keep dragging to cross more lanes (a barrel roll in the air)
+   * - press and hold: boost while held; slide while holding to change lane
    * - tap, or swipe up: jump (then tap again in the air to flip)
-   * - press and hold: jump and fly while held; slide while holding to steer
    * - swipe down: slam
-   * Each finger is tracked on its own, so two-thumbed players can combine them with the buttons.
+   * Each finger is tracked on its own, so gestures and the on-screen controls work together.
    */
   attachGestures(el: HTMLElement, onLane?: (side: 'left' | 'right') => void) {
     interface Finger {
@@ -125,8 +125,7 @@ export class Input {
       f.timer = window.setTimeout(() => {
         if (f.swiped) return;
         f.holding = true;
-        this.press('jump');
-        this.hold('jump', true);
+        this.hold('boost', true);
       }, HOLD_MS);
       fingers.set(e.pointerId, f);
     });
@@ -136,7 +135,7 @@ export class Input {
       const dx = e.clientX - f.x;
       const dy = e.clientY - f.sy;
       if (Math.max(Math.abs(e.clientX - f.sx), Math.abs(dy)) > STILL_PX && !f.holding) clearTimeout(f.timer);
-      // Sideways: a lane per SWIPE_PX of travel, also while holding (steering in flight).
+      // Sideways: a lane per SWIPE_PX of travel, also while holding (changing lane under boost).
       if (Math.abs(dx) >= SWIPE_PX && Math.abs(dx) > Math.abs(dy) * 0.8) {
         const side = dx < 0 ? 'left' : 'right';
         this.press(side);
@@ -158,7 +157,7 @@ export class Input {
       clearTimeout(f.timer);
       if (f.holding) {
         // Other fingers may still be holding.
-        if (![...fingers.values()].some((o) => o.holding)) this.hold('jump', false);
+        if (![...fingers.values()].some((o) => o.holding)) this.hold('boost', false);
       } else if (!f.swiped && e.type === 'pointerup') {
         this.press('jump'); // a tap
       }

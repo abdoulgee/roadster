@@ -6,7 +6,6 @@ export type Screen = 'menu' | 'playing' | 'paused' | 'over';
 
 export interface RunSummary {
   score: number;
-  maxStreak: number;
   distance: number;
   time: number;
   best: number;
@@ -18,10 +17,10 @@ export type PopupTone = 'good' | 'great' | 'warn';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
-/** How far (px) a finger slides on the jump button before it counts as a flick. */
+/** How far (px) a finger pushes the JUMP stick before it counts as a lane change or a slam. */
 const FLICK_PX = 26;
-/** How far the jump button's face follows the finger, px. */
-const KNOB_TRAVEL = 16;
+/** How far the stick's knob follows the finger, px. */
+const KNOB_TRAVEL = 30;
 
 const POWER_STYLE: Record<PowerKind, { name: string; sub: string; color: string }> = {
   starman: { name: '★ STARMAN', sub: 'INVINCIBLE · ×2 SCORE', color: '#ffd23f' },
@@ -118,23 +117,34 @@ export class Hud {
       btn.addEventListener('pointerup', release);
       btn.addEventListener('pointercancel', release);
       btn.addEventListener('contextmenu', (e) => e.preventDefault());
-      if (action === 'boost') this.bindFlicks(btn, handlers.flick, () => pointer);
+      if (action === 'jump') this.bindStick(btn, handlers, () => pointer);
     }
   }
 
   /**
-   * The BOOST button doubles as a stick, so one thumb can boost and steer: while it is held, sliding
-   * left or right changes lane (repeating across several lanes); a flick down slams.
+   * The JUMP stick: touching it jumps and holding it flies (the button's own press and hold). While it is
+   * held, pushing left or right changes lane (repeating across several lanes, also in flight) and a
+   * flick down slams, letting go of the fly so it doesn't fight the dive. The knob follows the thumb.
    */
-  private bindFlicks(btn: HTMLElement, flick: (dir: 'left' | 'right' | 'down') => void, pointer: () => number | null) {
+  private bindStick(
+    btn: HTMLElement,
+    handlers: { flick(dir: 'left' | 'right' | 'down'): void; touch(action: TouchAction, down: boolean): void },
+    pointer: () => number | null,
+  ) {
     let startX = 0;
+    let startY = 0;
     let anchorX = 0;
     let anchorY = 0;
     let slammed = false;
+    const pop = (cls: string) => {
+      btn.classList.remove(cls);
+      void btn.offsetWidth;
+      btn.classList.add(cls);
+    };
     btn.addEventListener('pointerdown', (e) => {
       if (e.pointerId !== pointer()) return;
       startX = anchorX = e.clientX;
-      anchorY = e.clientY;
+      startY = anchorY = e.clientY;
       slammed = false;
     });
     btn.addEventListener('pointermove', (e) => {
@@ -142,21 +152,32 @@ export class Hud {
       const dx = e.clientX - anchorX;
       const dy = e.clientY - anchorY;
       if (Math.abs(dx) >= FLICK_PX && Math.abs(dx) > Math.abs(dy)) {
-        flick(dx < 0 ? 'left' : 'right');
+        handlers.flick(dx < 0 ? 'left' : 'right');
         anchorX = e.clientX;
         anchorY = e.clientY;
-        btn.classList.remove('flick-l', 'flick-r');
-        void btn.offsetWidth;
-        btn.classList.add(dx < 0 ? 'flick-l' : 'flick-r');
+        pop(dx < 0 ? 'flick-l' : 'flick-r');
       } else if (!slammed && dy >= FLICK_PX && dy > Math.abs(dx)) {
-        flick('down');
+        handlers.flick('down');
+        handlers.touch('jump', false);
         slammed = true;
         anchorY = e.clientY;
+        pop('flick-d');
       }
-      const knob = Math.max(-KNOB_TRAVEL, Math.min(KNOB_TRAVEL, e.clientX - startX));
-      btn.style.setProperty('--knob', `${knob}px`);
+      // The knob follows the thumb, held inside the ring.
+      let kx = e.clientX - startX;
+      let ky = e.clientY - startY;
+      const k = Math.hypot(kx, ky);
+      if (k > KNOB_TRAVEL) {
+        kx *= KNOB_TRAVEL / k;
+        ky *= KNOB_TRAVEL / k;
+      }
+      btn.style.setProperty('--kx', `${kx.toFixed(1)}px`);
+      btn.style.setProperty('--ky', `${ky.toFixed(1)}px`);
     });
-    const reset = () => btn.style.setProperty('--knob', '0px');
+    const reset = () => {
+      btn.style.setProperty('--kx', '0px');
+      btn.style.setProperty('--ky', '0px');
+    };
     btn.addEventListener('pointerup', reset);
     btn.addEventListener('pointercancel', reset);
   }
@@ -347,7 +368,6 @@ export class Hud {
     $('over-dist').textContent = `${Math.floor(run.distance).toLocaleString()} m`;
     $('over-time').textContent = formatTime(run.time);
     $('over-best').textContent = run.best.toLocaleString();
-    $('over-streak').textContent = run.maxStreak > 0 ? `×${run.maxStreak}` : '—';
     $('over-record').classList.toggle('hidden', !run.isRecord);
     this.show('over');
   }

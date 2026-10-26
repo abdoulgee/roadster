@@ -61,22 +61,24 @@
         <div class="tc-edge right" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" /></svg></div>
         <div class="tc-guide" aria-hidden="true">
           <span><b>← →</b>Swipe · lane</span>
-          <span><b>TAP</b>Jump</span>
-          <span><b>HOLD</b>Fly</span>
+          <span><b>HOLD</b>Boost</span>
+          <span><b>STICK</b>Jump · hold to fly</span>
           <span><b>↓</b>Swipe · slam</span>
         </div>
-        <!-- Thumb dock: within reach of one thumb, whichever hand. -->
-        <div class="tc-dock">
+        <div class="tc-left">
           <button class="touch-btn small item" data-touch="item" tabindex="-1" aria-label="Use item">
             <svg viewBox="0 0 24 24"><path d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.4 6.7 19.4l1.2-6L3.4 9.3l6-.7z" /></svg>
             <img class="tc-item-icon" alt="" />
             <span>ITEM</span>
           </button>
-          <button class="touch-btn boost" data-touch="boost" tabindex="-1" aria-label="Boost: hold, slide to change lane">
-            <i class="flick-hint l"></i><i class="flick-hint r"></i>
-            <span class="knob">
-              <svg viewBox="0 0 24 24"><path d="M13 3L5 14h6l-1 7 8-11h-6z" /></svg>
-              <span>BOOST</span>
+        </div>
+        <!-- JUMP stick: touch to jump, keep holding to fly, push left/right for lanes, flick down to slam. -->
+        <div class="tc-right">
+          <button class="stick" data-touch="jump" tabindex="-1" aria-label="Jump stick: hold to fly, push sideways to change lane, flick down to slam">
+            <i class="stick-mark l"></i><i class="stick-mark r"></i><i class="stick-mark d"></i>
+            <span class="stick-knob">
+              <svg viewBox="0 0 24 24"><path d="M5 15l7-7 7 7" /></svg>
+              <span>JUMP</span>
             </span>
           </button>
         </div>
@@ -137,7 +139,7 @@
           clears and near misses into a streak to raise your multiplier. Grab air orbs to charge ROCKET
           mode, and the golden star for STARMAN.
         </p>
-        <p class="note touch-note">One thumb does it all: swipe left or right to change lane, tap or swipe up to jump (flips happen on their own), hold to fly and slide to steer, swipe down to slam. Hold BOOST to boost; slide it to change lane too.</p>
+        <p class="note touch-note">JUMP stick (right): touch to jump, keep holding to fly, push it left or right to change lane (also while flying), flick it down to slam. Anywhere on the screen: swipe left or right to change lane, hold to boost and slide to change lane while boosting, swipe down to slam. ITEM is on the left.</p>
       </div>
       <!-- Garage: the arrows flank the orbiting car; the game positions this layer every frame. -->
       <div id="garage" class="garage" aria-label="Choose your car">
@@ -172,7 +174,6 @@
         <div class="run-stats">
           <div><label>Distance</label><b id="over-dist">0 m</b></div>
           <div><label>Time</label><b id="over-time">0:00</b></div>
-          <div><label>Max streak</label><b id="over-streak">0</b></div>
           <div><label>Best</label><b id="over-best">0</b></div>
         </div>
         <button id="btn-retry" class="btn primary" tabindex="-1">Retry <kbd>SPACE</kbd></button>

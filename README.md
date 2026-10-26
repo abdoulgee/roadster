@@ -14,30 +14,29 @@ npm run build    # production build in dist/
 
 ## Controls
 
-| Action | Keyboard | Touch (one thumb, anywhere on the game view) |
+| Action | Keyboard | Touch |
 | --- | --- | --- |
-| Change lane / barrel roll in the air | ← → (A D) | Swipe left / right (keep dragging to cross more lanes) · or slide on BOOST |
-| Jump · flip | ↑ / Space (W); press again in the air to flip | Tap or swipe up; one flip happens on its own in the air, tap again for more |
-| Fly | Hold ↑ / Space | Press and hold; slide while holding to steer |
-| Slam down | ↓ (S) | Swipe down · or flick BOOST down |
-| Boost | Shift | Hold BOOST |
-| Use item | Z (E) | ITEM (shows the held item) |
+| Change lane / barrel roll in the air | ← → (A D) | Push the JUMP stick left / right (also while flying) · or swipe left / right anywhere |
+| Jump · flip | ↑ / Space (W); press again in the air to flip | Touch the JUMP stick (or tap / swipe up anywhere); one flip happens on its own in the air, touch again for more |
+| Fly | Hold ↑ / Space | Keep holding the JUMP stick |
+| Slam down | ↓ (S) | Flick the JUMP stick down · or swipe down anywhere |
+| Boost | Shift | Press and hold anywhere on the screen; slide while holding to change lane |
+| Use item | Z (E) | ITEM, bottom left (shows the held item) |
 | Pause · sound | P / Esc · M | Buttons |
 
-Phones and tablets get the touch controls automatically (coarse pointer or no hover). They are built
-for one-handed play: everything except boost and items is a gesture anywhere on the screen, and the
-only two buttons sit in a small dock where a thumb rests (centred low in portrait, bottom right in
-landscape). Every finger is tracked on its own, so two-thumbed players can mix gestures and buttons.
-A short guide shows the gestures at the start of each run. Tuning lives in `systems/input.ts`
-(`SWIPE_PX`, `HOLD_MS`, `STILL_PX`) and the dock in `style.css` (`--btn-main`, `--tc-lift`). In dev,
-add `?touch` to the URL to force touch controls on a desktop (the mouse then swipes). Portrait
+Phones and tablets get the touch controls automatically (coarse pointer or no hover): ITEM on the
+left, the JUMP analog stick on the right, and gestures anywhere else on the screen. Every finger is
+tracked on its own, so the stick, gestures and ITEM all work together. A short guide shows the
+controls at the start of each run. Tuning lives in `systems/input.ts` (`SWIPE_PX`, `HOLD_MS`,
+`STILL_PX`), `ui/hud.ts` (`FLICK_PX`, `KNOB_TRAVEL` for the stick) and `style.css` (`--stick`,
+`--tc-lift`). In dev, add `?touch` to the URL to force touch controls on a desktop. Portrait
 screens use a higher, wider camera so the neighbouring lanes stay in view.
 
 ## Pilot name and online scores (optional)
 
 On the first visit the menu asks for a pilot name (the pencil on the pilot card changes it).
-The ranking screen has been removed; after a run the game-over panel still shows where the
-score places. Without configuration that is among runs on this device. To save scores online:
+There is no ranking screen, and the game-over panel doesn't show where a run places; runs are
+still saved (on this device, or online once configured). To save scores online:
 
 1. Create a free project at [supabase.com](https://supabase.com).
 2. Open **SQL Editor**, paste the contents of `supabase/schema.sql` and run it.

@@ -809,28 +809,21 @@ h1 span:last-child {
   --safe-t: max(12px, env(safe-area-inset-top));
 }
 
-/* One-hand layout: the game view takes swipes, taps and holds anywhere; the only buttons sit in a
-   small dock where a thumb rests. Portrait: centred, reachable by either thumb. Landscape: bottom right. */
+/* ITEM on the left, the JUMP stick on the right, both lifted off the bottom edge; the game view
+   between them takes swipes and holds (lanes, boost). */
 .touch .touch-controls {
   position: absolute;
   left: var(--safe-l);
   right: var(--safe-r);
   bottom: calc(var(--safe-b) + var(--tc-lift));
   display: flex;
-  justify-content: center;
+  justify-content: space-between;
   align-items: flex-end;
 }
 
-.tc-dock {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-}
-
-@media (orientation: landscape) {
-  .touch .touch-controls {
-    justify-content: flex-end;
-  }
+/* ITEM sits level with the middle of the stick. */
+.tc-left {
+  margin-bottom: calc((var(--stick) - var(--btn-small)) / 2);
 }
 
 .touch .touch-note {
@@ -847,6 +840,7 @@ h1 span:last-child {
 .touch {
   --btn-small: clamp(56px, 16vw, 70px);
   --btn-main: clamp(88px, 27vw, 112px);
+  --stick: clamp(116px, 34vw, 148px);
   --tc-lift: clamp(28px, 9vh, 96px);
 }
 
@@ -854,6 +848,7 @@ h1 span:last-child {
   .touch {
     --btn-small: clamp(50px, 14vh, 64px);
     --btn-main: clamp(80px, 25vh, 104px);
+    --stick: clamp(108px, 32vh, 140px);
     --tc-lift: clamp(14px, 6vh, 48px);
   }
 }
@@ -1027,55 +1022,90 @@ h1 span:last-child {
   display: none;
 }
 
-/* BOOST: the big dock button. Hold to boost; it is also a stick (slide for lanes, flick down to slam). */
-.touch-btn.boost {
+/* JUMP stick: a ring with a knob that follows the thumb. */
+.stick {
   position: relative;
-  width: var(--btn-main);
-  height: var(--btn-main);
-  border-color: rgba(255, 154, 61, 0.6);
-  color: #ffb06b;
-  font-size: 11px;
+  display: grid;
+  place-items: center;
+  width: var(--stick);
+  height: var(--stick);
+  padding: 0;
+  border: 1.5px solid rgba(143, 227, 255, 0.4);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(14, 12, 22, 0.2) 40%, rgba(14, 12, 22, 0.55) 72%);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35), inset 0 0 18px rgba(143, 227, 255, 0.12);
+  color: var(--air);
+  pointer-events: auto;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.touch-btn.boost svg {
-  width: 32px;
-  height: 32px;
-  fill: currentColor;
-  stroke-width: 1.5;
-}
-
-.touch-btn.boost .knob {
+.stick-knob {
   display: flex;
   flex-direction: column;
-  align-items: center;
   gap: 2px;
-  transform: translateX(var(--knob, 0px));
-  transition: transform 0.06s;
+  align-items: center;
+  justify-content: center;
+  width: 56%;
+  height: 56%;
+  border: 1.5px solid rgba(143, 227, 255, 0.6);
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 35%, rgba(255, 255, 255, 0.2), rgba(14, 12, 22, 0.7) 75%);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+  font: 700 11px var(--font-ui);
+  letter-spacing: 0.12em;
+  transform: translate(var(--kx, 0px), var(--ky, 0px));
+  transition: transform 0.05s, background 0.08s;
 }
 
-.flick-hint {
+.stick-knob svg {
+  width: 30px;
+  height: 30px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.stick.active .stick-knob {
+  background: radial-gradient(circle at 50% 35%, rgba(143, 227, 255, 0.45), rgba(14, 12, 22, 0.7) 75%);
+}
+
+/* Small chevrons on the ring: lanes left and right, slam down. They flash when used. */
+.stick-mark {
   position: absolute;
-  top: 50%;
-  width: 8px;
-  height: 8px;
+  width: 9px;
+  height: 9px;
   border: solid currentColor;
   border-width: 0 0 2px 2px;
-  opacity: 0.5;
-  translate: 0 -50%;
+  opacity: 0.45;
 }
 
-.flick-hint.l {
-  left: 10px;
+.stick-mark.l {
+  left: 9px;
+  top: 50%;
+  translate: 0 -50%;
   rotate: 45deg;
 }
 
-.flick-hint.r {
-  right: 10px;
+.stick-mark.r {
+  right: 9px;
+  top: 50%;
+  translate: 0 -50%;
   rotate: -135deg;
 }
 
-.touch-btn.boost.flick-l .flick-hint.l,
-.touch-btn.boost.flick-r .flick-hint.r {
+.stick-mark.d {
+  bottom: 9px;
+  left: 50%;
+  translate: -50% 0;
+  rotate: -45deg;
+}
+
+.stick.flick-l .stick-mark.l,
+.stick.flick-r .stick-mark.r,
+.stick.flick-d .stick-mark.d {
   animation: flick-pop 0.3s ease-out;
 }
 
@@ -1085,7 +1115,7 @@ h1 span:last-child {
     scale: 1.8;
   }
   to {
-    opacity: 0.5;
+    opacity: 0.45;
     scale: 1;
   }
 }
@@ -1099,11 +1129,6 @@ h1 span:last-child {
   transform: scale(0.92);
   background: rgba(255, 255, 255, 0.28);
   border-color: rgba(255, 255, 255, 0.6);
-}
-
-.touch-btn.boost.active {
-  background: rgba(255, 106, 61, 0.5);
-  border-color: var(--air-low);
 }
 
 /* HUD around the controls */
@@ -1192,7 +1217,7 @@ h1 span:last-child {
   .touch .hud-air {
     top: auto;
     bottom: calc(var(--safe-b) + 4px);
-    width: min(320px, calc(100% - 2 * var(--safe-l) - 2 * (var(--btn-main) + var(--btn-small) + 40px)));
+    width: min(320px, calc(100% - 2 * var(--safe-l) - 2 * (var(--stick) + 20px)));
   }
   .touch .hud-slots {
     top: calc(var(--safe-t) + 40px);
