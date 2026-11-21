@@ -24,6 +24,7 @@ const SKY_FRAGMENT = /* glsl */ `
   uniform vec3 sunDir;
   uniform float clouds;
   uniform float stars;
+  uniform float aurora;
   uniform float time;
   varying vec3 vDir;
 
@@ -71,6 +72,18 @@ const SKY_FRAGMENT = /* glsl */ `
         float trail = step(0.0, along) * (1.0 - smoothstep(0.0, 0.16, along)) * (1.0 - smoothstep(0.0, 0.0025, across));
         col += vec3(0.85, 0.9, 1.0) * trail * stars * 2.5 * (1.0 - age / 0.7);
       }
+    }
+
+    if (aurora > 0.001 && d.y > 0.12) {
+      vec2 sky = vec2(atan(d.x, -d.z), asin(d.y));
+      float drift = sky.x * 2.8 + fbm(vec2(sky.x * 2.0, time * 0.045)) * 1.8 + time * 0.08;
+      float folds = 0.5 + 0.5 * sin(drift * 3.0 + sky.x * 4.0);
+      float band = smoothstep(0.18, 0.42, sky.y + sin(sky.x * 3.2 + time * 0.06) * 0.11)
+                 * (1.0 - smoothstep(0.72, 1.0, sky.y));
+      float veil = smoothstep(0.38, 0.78, fbm(vec2(sky.x * 3.4 + time * 0.035, sky.y * 5.0 + drift)));
+      float light = band * veil * (0.25 + 0.75 * pow(folds, 3.0)) * aurora;
+      vec3 curtain = mix(vec3(0.04, 0.9, 0.62), vec3(0.28, 0.3, 1.0), smoothstep(0.35, 0.88, folds));
+      col += curtain * light * 0.72;
     }
 
     float cover = 0.0;
@@ -210,6 +223,7 @@ function groundMaterial(map: THREE.Texture, field: ZoneField, scroll: { value: n
   const base = ZONES.map((z) => new THREE.Color(z.palette.ground));
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uZoneField = { value: field.texture };
+    shader.uniforms.uZoneFieldExtra = { value: field.extraTexture };
     shader.uniforms.uScroll = scroll;
     shader.uniforms.uBase = { value: base };
     shader.vertexShader = shader.vertexShader
@@ -221,7 +235,7 @@ function groundMaterial(map: THREE.Texture, field: ZoneField, scroll: { value: n
         `#include <common>
         varying vec3 vGround;
         uniform float uScroll;
-        uniform vec3 uBase[4];
+        uniform vec3 uBase[5];
         ${NOISE_GLSL}
         ${ZONE_FIELD_GLSL}`,
       )
@@ -274,6 +288,16 @@ function groundMaterial(map: THREE.Texture, field: ZoneField, scroll: { value: n
           ground += zw.a * city;
           rough -= zw.a * 0.55;
         }
+        float arctic = zoneFiveAtZ(vGround.z);
+        if (arctic > 0.004) {
+          vec2 facets = wCells(gp * 0.17);
+          float seam = 1.0 - smoothstep(0.0, 0.055, facets.y - facets.x);
+          float frost = wFbm(gp * 0.11 + vec2(4.0, 8.0));
+          vec3 ice = uBase[4] * (0.76 + 0.18 * frost + 0.12 * broad);
+          ice = mix(ice, vec3(0.28, 0.68, 0.76), seam * 0.62);
+          ground += arctic * ice;
+          rough -= arctic * 0.22;
+        }
         diffuseColor.rgb *= ground;`,
       )
       .replace(
@@ -300,7 +324,12 @@ export class Environment {
   private readonly envScene = new THREE.Scene();
   private readonly neonRing: THREE.Mesh<THREE.CylinderGeometry, THREE.MeshBasicMaterial>;
   private envTarget: THREE.WebGLRenderTarget | null = null;
-  private readonly envKey = new Float32Array(13);
+  private carEnvTarget: THREE.WebGLRenderTarget | null = null;
+  /** Soft light strips seen only in the car's reflections, like a photo studio's softboxes. */
+  private readonly studio = new THREE.Group();
+  private readonly studioTop = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, fog: false });
+  private readonly studioSide = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, fog: false });
+  private readonly envKey = new Float32Array(14);
   private envAge = 99;
   private readonly farRidge: THREE.MeshStandardMaterial;
   private readonly nearRidge: THREE.MeshStandardMaterial;
@@ -348,6 +377,7 @@ export class Environment {
           sunDir: { value: new THREE.Vector3(...SUN_DIR).normalize() },
           clouds: { value: 0 },
           stars: { value: 0 },
+          aurora: { value: 0 },
           time: { value: 0 },
         },
       }),
@@ -363,6 +393,7 @@ export class Environment {
       new THREE.MeshBasicMaterial({ map: neonBandTexture(), side: THREE.BackSide, transparent: true, depthWrite: false }),
     );
     this.envScene.add(this.neonRing);
+    this.buildStudio();
 
     this.groundTex = groundTexture(renderer);
     this.groundTex.repeat.set(1200 / GROUND_TILE, 1200 / GROUND_TILE);
@@ -392,6 +423,7 @@ export class Environment {
     u.sunColor.value.copy(p.sun);
     u.clouds.value = p.clouds;
     u.stars.value = p.stars;
+    u.aurora.value = p.aurora;
     (this.scene.background as THREE.Color).copy(p.horizon);
     this.fog.color.copy(p.horizon);
     this.fog.near = p.fogNear;
@@ -431,16 +463,56 @@ export class Environment {
    */
   private refreshReflections(p: Palette) {
     const key = [p.skyTop, p.skyMid, p.horizon, p.sun].flatMap((c) => [c.r, c.g, c.b]);
-    key.push(p.skyline);
+    key.push(p.skyline, p.aurora);
     let change = 0;
     for (let i = 0; i < key.length; i++) change += Math.abs(key[i] - this.envKey[i]);
     if (this.envTarget && (change < 0.03 || this.envAge < (IS_TOUCH ? 1 : 0.3))) return;
     this.envKey.set(key);
     this.envAge = 0;
+    this.studio.visible = false;
     const next = this.pmrem.fromScene(this.envScene, 0, 1, 2000);
     this.scene.environment = next.texture;
     this.envTarget?.dispose();
     this.envTarget = next;
+
+    // The car's own map: the same sky with the studio strips lit in the zone's light, so its paint
+    // carries long clean highlights down the doors and along the roof whatever the sky is doing.
+    this.tintStudio(p);
+    this.studio.visible = true;
+    const car = this.pmrem.fromScene(this.envScene, 0, 1, 2000);
+    this.studio.visible = false;
+    this.scene.userData.carEnvironment = car.texture;
+    this.carEnvTarget?.dispose();
+    this.carEnvTarget = car;
+  }
+
+  /**
+   * One long softbox overhead running nose to tail and a strip low down either side for a crisp line
+   * along the flanks. (A panel behind the car only ever showed as a blotch on the hood from the front.)
+   */
+  private buildStudio() {
+    const top = new THREE.Mesh(new THREE.PlaneGeometry(70, 520), this.studioTop);
+    top.rotation.x = Math.PI / 2;
+    top.position.y = 260;
+    this.studio.add(top);
+    for (const side of [-1, 1]) {
+      // Thin and only a few degrees above the horizon: the doors catch it as a clean line, while the hood,
+      // which only sees it at a grazing angle, would smear a taller strip into a blotch.
+      const strip = new THREE.Mesh(new THREE.PlaneGeometry(520, 9), this.studioSide);
+      strip.rotation.y = Math.PI / 2;
+      strip.position.set(side * 240, 30, 0);
+      this.studio.add(strip);
+    }
+    this.studio.visible = false;
+    this.envScene.add(this.studio);
+  }
+
+  private tintStudio(p: Palette) {
+    // Warm-white daylight softboxes that fade toward neon (cyan overhead, magenta at the sides) at night.
+    const day = 1 - p.stars;
+    const base = this.tmp.setRGB(1, 0.97, 0.92).lerp(p.sun, 0.25);
+    this.studioTop.color.copy(base).multiplyScalar(2.4 * day).add(new THREE.Color(0.2, 0.9, 1.4).multiplyScalar(p.skyline));
+    this.studioSide.color.copy(base).multiplyScalar(2.4 * day).add(new THREE.Color(1.6, 0.25, 1.1).multiplyScalar(p.skyline));
   }
 
   /** Mountain material with snow above `snowLine` metres, scaled by the zone's snow amount. */

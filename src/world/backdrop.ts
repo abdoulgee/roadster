@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { mulberry32, type Rng } from '../util/rng';
 import { bendUniforms } from './bend';
-import { zoneWeights, type Palette } from './zones';
+import { ZONES, zoneWeights, type Palette } from './zones';
 
 /** A point on the backdrop ring: `angle` 0 is straight down the road (-z), positive to the right. */
 function ringPos(angle: number, dist: number) {
@@ -71,7 +71,7 @@ export class Backdrop {
   private readonly flock = new THREE.Group();
   private readonly plane = new THREE.Group();
   private readonly contrail: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
-  private readonly weights = [0, 0, 0, 0];
+  private readonly weights = Array(ZONES.length).fill(0) as number[];
   private time = 0;
 
   constructor(scene: THREE.Scene) {

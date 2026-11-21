@@ -221,6 +221,7 @@ const SCATTER_VERTEX_HEAD = /* glsl */ `
   uniform float uScroll;
   uniform float uTime;
   uniform vec4 uZoneMask;
+  uniform float uZoneFiveMask;
   uniform float uSway;
   uniform float uHeight;
   uniform float uRoll;
@@ -248,7 +249,7 @@ const SCATTER_BEGIN = /* glsl */ `
     rollAngle = -travel / 0.55;
   }
   // Grow in where this kind's zone begins and shrink away where it ends.
-  float grow = smoothstep(0.0, 1.0, dot(zoneAtZ(scatterZ), uZoneMask));
+  float grow = smoothstep(0.0, 1.0, dot(zoneAtZ(scatterZ), uZoneMask) + zoneFiveAtZ(scatterZ) * uZoneFiveMask);
   vec3 transformed = position;
   if (uSway > 0.0) {
     float bend = clamp(position.y / uHeight, 0.0, 1.0);
@@ -269,8 +270,8 @@ export class Scatter {
   private readonly scroll = { value: 0 };
   private readonly time = { value: 0 };
   private readonly layers: { zone: number; mesh: THREE.Mesh }[] = [];
-  private readonly weights = [0, 0, 0, 0];
-  private readonly present = [false, false, false, false];
+  private readonly weights = Array(ZONES.length).fill(0) as number[];
+  private readonly present = Array(ZONES.length).fill(false) as boolean[];
   private offset = 0;
 
   constructor(scene: THREE.Scene, field: ZoneField) {
@@ -295,6 +296,9 @@ export class Scatter {
       { zone: 2, geometry: saplingGeometry(rng), count: 110, near: 4, far: 60, scale: [0.8, 1.4], sway: 0.12, height: 2.5 },
       { zone: 2, geometry: logGeometry(rng), count: 24, near: 4, far: 50, scale: [0.9, 1.2] },
       { zone: 2, geometry: rockGeometry(rng, 0x7d7f78), count: 90, near: 3, far: 70, scale: [0.6, 2.2] },
+      // Aurora coast: ice prisms and blue-grey shore stones.
+      { zone: 4, geometry: saltCrystalGeometry(rng), count: 220, near: 2, far: 85, scale: [0.65, 1.75] },
+      { zone: 4, geometry: rockGeometry(rng, 0x557482), count: 130, near: 4, far: 90, scale: [0.7, 2.7] },
     ];
     for (const kind of kinds) {
       const mesh = this.build(kind, Math.max(1, Math.round(kind.count * density)), rng, field);
@@ -343,13 +347,15 @@ export class Scatter {
       side: kind.doubleSide ? THREE.DoubleSide : THREE.FrontSide,
     });
     const mask = new THREE.Vector4();
-    mask.setComponent(kind.zone, 1);
+    if (kind.zone < 4) mask.setComponent(kind.zone, 1);
     mat.onBeforeCompile = (shader) => {
       Object.assign(shader.uniforms, {
         uScroll: this.scroll,
         uTime: this.time,
         uZoneField: { value: field.texture },
+        uZoneFieldExtra: { value: field.extraTexture },
         uZoneMask: { value: mask },
+        uZoneFiveMask: { value: kind.zone === 4 ? 1 : 0 },
         uSway: { value: kind.sway ?? 0 },
         uHeight: { value: kind.height ?? 1 },
         uRoll: { value: kind.roll ?? 0 },

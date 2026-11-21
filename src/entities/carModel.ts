@@ -3,6 +3,7 @@ import { mergeGeometries, toCreasedNormals } from 'three/examples/jsm/utils/Buff
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { clamp } from '../util/math';
 import { smoothstep, superellipse } from '../util/shape';
+import type { PaintFinish, WheelFinish } from './finishes';
 
 // The car-body engine. Every playable car is a `CarDesign` (see entities/cars/): side and plan profiles,
 // glazing, lights and wheels. `buildCar` turns a design into a model with the interface Player drives.
@@ -19,6 +20,13 @@ export interface CarModel {
   /** Sideways cold-gas jets on the front wings, 0–1 each. */
   setSideJets(left: number, right: number): void;
   setPaintGlow(color: THREE.ColorRepresentation, intensity: number): void;
+  /**
+   * Moves the sprung body (shell, glass, cabin) against the wheels: `heave` in metres (+ up), `pitch` in
+   * radians (+ nose up) and `roll` in radians.
+   */
+  setSuspension(heave: number, pitch: number, roll: number): void;
+  /** Paint shop: repaints the body and wheels; null restores the design's factory finish. */
+  setFinish(paint: PaintFinish | null, wheels: WheelFinish | null): void;
   /** How the smoke columns are lit: an overall tint and the sun they glow towards (world direction). */
   setSmokeLight(tint: THREE.Color, sunColor: THREE.Color, sunDir: THREE.Vector3): void;
 }
@@ -86,7 +94,8 @@ export interface Profiles {
 
 export type RimStyle = 'split' | 'turbine' | 'aero' | 'cyber' | 'blade';
 
-export type DecalMaterial = 'trim' | 'gap' | 'lens' | 'head' | 'tailLens' | 'tail' | 'chrome' | 'paint';
+/** `glow` is a hot nozzle throat that brightens with the boost flame. */
+export type DecalMaterial = 'trim' | 'gap' | 'lens' | 'head' | 'tailLens' | 'tail' | 'chrome' | 'paint' | 'glow';
 
 export interface Decal {
   material: DecalMaterial;
@@ -529,6 +538,31 @@ function maskByBodyUv<T extends THREE.Material>(mat: T, key: string, inside: Reg
 
 // ---------- wheels ----------
 
+let tyreGrain: THREE.Texture | null = null;
+
+/** Fine, repeating rubber grain for the tyre sidewalls and tread. */
+function tyreGrainMap() {
+  if (tyreGrain) return tyreGrain;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 128;
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = '#858585';
+  ctx.fillRect(0, 0, 128, 128);
+  for (let i = 0; i < 2400; i++) {
+    const value = 95 + Math.random() * 90;
+    ctx.fillStyle = `rgb(${value},${value},${value})`;
+    const size = Math.random() < 0.92 ? 1 : 2;
+    ctx.fillRect(Math.random() * 128, Math.random() * 128, size, size);
+  }
+  tyreGrain = new THREE.CanvasTexture(canvas);
+  tyreGrain.wrapS = tyreGrain.wrapT = THREE.RepeatWrapping;
+  tyreGrain.repeat.set(2, 2);
+  tyreGrain.anisotropy = 4;
+  tyreGrain.generateMipmaps = true;
+  tyreGrain.needsUpdate = true;
+  return tyreGrain;
+}
+
 function latheX(points: Pt[], segments: number) {
   const geo = new THREE.LatheGeometry(
     points.map(([r, a]) => new THREE.Vector2(r, a)),
@@ -851,6 +885,45 @@ function thrustersFor(d: CarDesign): Thrusters {
   };
 }
 
+// ---------- paint ----------
+
+let flakeMap: THREE.DataTexture | null = null;
+
+/**
+ * Metallic flake: a tangent-space normal map of tiny randomly tilted platelets for the base coat only.
+ * The clear coat keeps the smooth geometric normal, so reflections stay crisp while the colour coat
+ * glitters up close and averages out (via mipmaps) into a soft sheen at a distance.
+ */
+function paintFlakes() {
+  if (flakeMap) return flakeMap;
+  const size = 256;
+  const data = new Uint8Array(size * size * 4);
+  let seed = 1234567;
+  const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+  for (let i = 0; i < size * size; i++) {
+    // Mostly level flakes, a few steep ones that catch the light.
+    const tilt = Math.pow(rnd(), 2.2) * 0.9;
+    const a = rnd() * Math.PI * 2;
+    const x = Math.sin(tilt) * Math.cos(a);
+    const y = Math.sin(tilt) * Math.sin(a);
+    const z = Math.cos(tilt);
+    data.set([(x * 0.5 + 0.5) * 255, (y * 0.5 + 0.5) * 255, (z * 0.5 + 0.5) * 255, 255], i * 4);
+  }
+  flakeMap = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
+  flakeMap.wrapS = flakeMap.wrapT = THREE.RepeatWrapping;
+  flakeMap.magFilter = THREE.LinearFilter;
+  flakeMap.minFilter = THREE.LinearMipmapLinearFilter;
+  flakeMap.generateMipmaps = true;
+  flakeMap.anisotropy = 4;
+  // Body uv is (z, v) in metres: one tile every 40 cm puts a flake at about 1.5 mm.
+  flakeMap.repeat.set(2.5, 2.5);
+  flakeMap.needsUpdate = true;
+  return flakeMap;
+}
+
+/** Metallic paints get flake in the base coat; solid whites, chrome and brushed steel stay plain. */
+const flaked = (p: PaintFinish) => p.metalness >= 0.2 && p.metalness < 0.9 && !p.anisotropy;
+
 // ---------- the car ----------
 
 export function buildCar(d: CarDesign): CarModel {
@@ -871,6 +944,8 @@ export function buildCar(d: CarDesign): CarModel {
     clearcoat: d.paint.clearcoat,
     clearcoatRoughness: d.paint.clearcoatRoughness ?? 0.03,
     anisotropy: d.paint.anisotropy ?? 0,
+    normalMap: flaked(d.paint) ? paintFlakes() : null,
+    normalScale: new THREE.Vector2(0.22, 0.22),
   };
   const paint = maskByBodyUv(new THREE.MeshPhysicalMaterial(paintSpec), key('paint'), null, [CANOPY, GLASS]);
   const cabinShell = maskByBodyUv(
@@ -917,8 +992,14 @@ export function buildCar(d: CarDesign): CarModel {
     tail: new THREE.MeshStandardMaterial({ color: 0x330000, emissive: 0xff1a2a, emissiveIntensity: 3, ...decalBias }),
     chrome: new THREE.MeshStandardMaterial({ color: 0xd6d9de, metalness: 1, roughness: 0.18, ...decalBias }),
     paint: new THREE.MeshPhysicalMaterial({ ...paintSpec, ...decalBias }),
+    glow: new THREE.MeshStandardMaterial({ color: 0x150806, roughness: 0.6, emissive: 0xff6a2a, emissiveIntensity: 0.25, ...decalBias }),
   };
-  const tyre = new THREE.MeshStandardMaterial({ color: 0x141416, roughness: 0.86 });
+  const tyre = new THREE.MeshStandardMaterial({
+    color: 0x141416,
+    roughness: 0.88,
+    bumpMap: tyreGrainMap(),
+    bumpScale: 0.008,
+  });
   const rim = new THREE.MeshStandardMaterial({ color: d.wheels.rimColor, metalness: 0.85, roughness: 0.3 });
   const coverMat = new THREE.MeshStandardMaterial({ color: d.wheels.coverColor ?? d.wheels.rimColor, metalness: 0.5, roughness: 0.45, side: THREE.DoubleSide });
   const machined = new THREE.MeshStandardMaterial({ color: 0xb4b8bf, metalness: 1, roughness: 0.22, side: THREE.DoubleSide });
@@ -945,19 +1026,23 @@ export function buildCar(d: CarDesign): CarModel {
 
   // The scene environment is kept dim for the world. Materials only honour envMapIntensity with their own
   // envMap, so the car's paint and glass adopt the scene's map and take a stronger share of it.
-  const reflective: [THREE.MeshStandardMaterial, number][] = [
-    [paint, 1.8],
-    [canopy, 1.6],
-    [glass, 2.4],
-    [lens, 2.5],
-    [tailLens, 2.2],
-    [decalMats.chrome as THREE.MeshStandardMaterial, 2],
-    [decalMats.paint as THREE.MeshStandardMaterial, 1.8],
+  // Paint and brightwork reflect the car's own map, the sky plus studio light strips (see Environment);
+  // the glass keeps the plain sky, where the strips would read as odd bright loops on the curved panes.
+  const reflective: [THREE.MeshStandardMaterial, number, boolean][] = [
+    [paint, 1.8, true],
+    [canopy, 1.6, false],
+    [glass, 2.4, false],
+    [lens, 2.5, true],
+    [tailLens, 2.2, true],
+    [decalMats.chrome as THREE.MeshStandardMaterial, 2, true],
+    [decalMats.paint as THREE.MeshStandardMaterial, 1.8, true],
   ];
   shell.onBeforeRender = (_renderer, scene) => {
-    for (const [m, boost] of reflective) {
-      if (m.envMap !== scene.environment) {
-        m.envMap = scene.environment;
+    const studio = (scene.userData.carEnvironment as THREE.Texture | undefined) ?? scene.environment;
+    for (const [m, boost, lit] of reflective) {
+      const env = lit ? studio : scene.environment;
+      if (m.envMap !== env) {
+        m.envMap = env;
         m.needsUpdate = true;
       }
       m.envMapIntensity = scene.environmentIntensity * boost;
@@ -1092,16 +1177,32 @@ export function buildCar(d: CarDesign): CarModel {
     return jet;
   });
 
-  const boostGeo = new THREE.ConeGeometry(0.17, 1.1, 10).rotateX(Math.PI / 2).translate(0, 0, 0.55);
+  const boostGeo = new THREE.ConeGeometry(0.17, 1.1, 12).rotateX(Math.PI / 2).translate(0, 0, 0.55);
   const boostMat = jetMaterial(0xff7a3d);
   const boostJets: THREE.Mesh[] = [];
+  // Three translucent layers give the exhaust a hot core and a softer expanding envelope.
+  const boostMidGeo = new THREE.ConeGeometry(0.115, 0.78, 12).rotateX(Math.PI / 2).translate(0, 0, 0.39);
+  const boostCoreGeo = new THREE.ConeGeometry(0.065, 0.48, 10).rotateX(Math.PI / 2).translate(0, 0, 0.24);
+  const boostMidMat = jetMaterial(0xffb354);
+  const boostCoreMat = jetMaterial(0xfff0ce);
+  const boostMids: THREE.Mesh[] = [];
+  const boostCores: THREE.Mesh[] = [];
   for (const [x, y] of thrusters.rear) {
     const jet = new THREE.Mesh(boostGeo, boostMat);
     jet.position.set(x, y, d.tail - 0.08);
     root.add(jet);
     boostJets.push(jet);
+    const mid = new THREE.Mesh(boostMidGeo, boostMidMat);
+    mid.position.copy(jet.position);
+    root.add(mid);
+    boostMids.push(mid);
+    const core = new THREE.Mesh(boostCoreGeo, boostCoreMat);
+    core.position.copy(jet.position);
+    root.add(core);
+    boostCores.push(core);
   }
 
+  const nozzleGlow = decalMats.glow as THREE.MeshStandardMaterial;
   const setJets = (lengths: readonly number[], boost: number, time: number) => {
     gas.uniforms.time.value = time % 600; // keep the noise coordinates small enough for float precision
     hoverJets.forEach((jet, i) => {
@@ -1112,10 +1213,16 @@ export function buildCar(d: CarDesign): CarModel {
       jet.scale.set(width, Math.max(len, 0.001), width);
     });
     boostJets.forEach((jet, i) => {
-      const flicker = 0.8 + 0.2 * Math.sin(time * 70 + i * 2.3);
+      const flicker = 0.88 + 0.12 * Math.sin(time * 58 + i * 2.3) + 0.035 * Math.sin(time * 113 + i * 4.1);
       jet.visible = boost > 0.02;
       jet.scale.set(1, 1, boost * flicker * 1.6);
+      boostMids[i].visible = boost > 0.02;
+      boostMids[i].scale.set(flicker, flicker, boost * flicker * 1.28);
+      boostCores[i].visible = boost > 0.02;
+      boostCores[i].scale.set(flicker, flicker, boost * flicker * 0.88);
     });
+    // Nozzle throats glow faintly at rest and white-hot while the boost burns.
+    nozzleGlow.emissiveIntensity = 0.25 + boost * (4 + Math.sin(time * 53) * 0.8);
   };
   setJets([0, 0, 0, 0], 0, 0);
 
@@ -1140,6 +1247,34 @@ export function buildCar(d: CarDesign): CarModel {
     gas.uniforms.uSunDir.value.copy(sunDir);
   };
 
+  const setSuspension = (heave: number, pitch: number, roll: number) => {
+    for (const g of [group, cabin]) {
+      g.position.y = heave;
+      g.rotation.set(pitch, 0, roll);
+    }
+  };
+
+  const factoryCover = { color: coverMat.color.getHex(), metalness: coverMat.metalness, roughness: coverMat.roughness };
+  const setFinish = (p: PaintFinish | null, w: WheelFinish | null) => {
+    const f = p ?? d.paint;
+    for (const m of [paint, decalMats.paint as THREE.MeshPhysicalMaterial]) {
+      m.color.setHex(f.color);
+      m.metalness = f.metalness;
+      m.roughness = f.roughness;
+      m.clearcoat = f.clearcoat;
+      m.clearcoatRoughness = f.clearcoatRoughness ?? 0.03;
+      m.anisotropy = f.anisotropy ?? 0;
+      m.normalMap = flaked(f) ? paintFlakes() : null;
+      m.needsUpdate = true; // flake, clear coat and anisotropy switch shader features
+    }
+    rim.color.setHex(w ? w.rim : d.wheels.rimColor);
+    rim.metalness = w ? w.metalness : 0.85;
+    rim.roughness = w ? w.roughness : 0.3;
+    coverMat.color.setHex(w ? w.cover : factoryCover.color);
+    coverMat.metalness = w ? Math.min(0.75, w.metalness) : factoryCover.metalness;
+    coverMat.roughness = w ? w.roughness + 0.12 : factoryCover.roughness;
+  };
+
   const width = Math.max(...d.axles.map((z) => d.P.width(z))) * 2 + 0.06;
   const spec: CarSpec = {
     id: d.id,
@@ -1150,5 +1285,5 @@ export function buildCar(d: CarDesign): CarModel {
     wheelRadius: W.radius,
     pivotY: Math.round(d.height * 0.52 * 100) / 100,
   };
-  return { root, wheels, spec, thrusters, setJets, setSideJets, setPaintGlow, setSmokeLight };
+  return { root, wheels, spec, thrusters, setJets, setSideJets, setPaintGlow, setSmokeLight, setSuspension, setFinish };
 }

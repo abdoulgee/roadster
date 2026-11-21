@@ -15,7 +15,7 @@ const DECK_Y = 11;
 type Kind = 'tunnel' | 'desertBridge' | 'cityBridge' | null;
 
 /** Which set piece each zone gets: open salt flats have none. */
-const ZONE_KIND: Kind[] = ['desertBridge', null, 'tunnel', 'cityBridge'];
+const ZONE_KIND: Kind[] = ['desertBridge', null, 'tunnel', 'cityBridge', null];
 
 function canvasTexture(w: number, h: number, draw: (ctx: CanvasRenderingContext2D) => void, srgb = true) {
   const canvas = document.createElement('canvas');

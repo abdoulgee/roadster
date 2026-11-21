@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { LANES, LANE_WIDTH, POINTS, TRAFFIC, laneX } from '../config';
 import { clamp, damp, lerp } from '../util/math';
 import { mulberry32, pick, shuffle, weighted, type Rng } from '../util/rng';
+import { contactShadow } from '../fx/contactShadow';
 import { SLOTS, TRAILER_VARIANTS, buildVehicleModel, type ModelKey, type Slot, type VehicleModel } from './vehicleModels';
 
 export type VehicleKind = 'sedan' | 'suv' | 'taxi' | 'bus' | 'semi';
@@ -240,6 +241,9 @@ export class Traffic {
     const side = Math.sign(v.x - fromX) || (this.rng() < 0.5 ? -1 : 1);
     const heavy = v.big ? 0.5 : 1;
     v.passed = true;
+    // Thrown off the road: its footprint no longer sits on the tarmac.
+    const shadow = v.obj.getObjectByName('contact-shadow');
+    if (shadow) shadow.visible = false;
     v.smash = {
       vx: side * (6 + this.rng() * 6) * heavy,
       vy: (9 + this.rng() * 6) * heavy,
@@ -335,6 +339,7 @@ export class Traffic {
       smash: null,
     };
     obj.position.set(v.x, 0, v.z);
+    obj.add(contactShadow(spec.len, spec.w));
     this.group.add(obj);
     this.vehicles.push(v);
     this.laneLast[lane] = v;

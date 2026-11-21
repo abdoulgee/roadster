@@ -27,8 +27,10 @@ import { Combo } from './systems/combo';
 import { IS_TOUCH, Input } from './systems/input';
 import type { CarId } from './entities/carModel';
 import { CARS, DEFAULT_CAR, carDesign, isCarId } from './entities/cars';
+import { PAINTS, WHEELS, paintItem, wheelItem } from './entities/finishes';
+import { Haptics } from './systems/haptics';
 import { Powers, type PowerEvent } from './systems/powers';
-import { Hud, type PopupTone } from './ui/hud';
+import { Hud, type FinishKind, type PopupTone } from './ui/hud';
 import { CallsignDialog } from './ui/onlinePanels';
 import { clamp, damp, lerp, sampleCurve } from './util/math';
 import { Backdrop } from './world/backdrop';
@@ -40,7 +42,21 @@ import { Structures } from './world/structures';
 import { ZoneField } from './world/zoneField';
 import { Palette, paletteAt, zoneAt } from './world/zones';
 
-type State = 'menu' | 'playing' | 'paused' | 'crashing' | 'over';
+type State = 'menu' | 'playing' | 'paused' | 'crashing' | 'over' | 'photo';
+
+interface Settings {
+  muted: boolean;
+  car: CarId;
+  /** Set once the player has picked a pilot name (until then the menu asks for one). */
+  named?: boolean;
+  haptics: boolean;
+  /** Paint shop picks per car. */
+  finishes: Partial<Record<CarId, { paint: string; wheels: string }>>;
+}
+
+/** Photo mode camera limits: distance from the car (m) and elevation (radians). */
+const PHOTO_DIST: readonly [number, number] = [2.6, 30];
+const PHOTO_PITCH: readonly [number, number] = [-0.08, 1.45];
 
 /** Screen room (px) a garage arrow takes beside the car, its gap and the screen margin included. */
 const GARAGE_ARROW_SPACE = 84;
@@ -49,6 +65,12 @@ const CRASH_DURATION = 1.1;
 const MAX_DT = 1 / 20;
 const BIG_STREAK = 5;
 const ORB_CHAIN_WINDOW = 0.6;
+
+/** Adaptive resolution: frame-time windows (s) and the render scale range it moves within. */
+const RES_WINDOW = 2;
+const RES_MIN = 0.6;
+const SLOW_FRAME = 1 / 48;
+const FAST_FRAME = 1 / 58;
 
 const POWER_GLOW: Record<PowerKind, number> = { starman: 0xffd23f, rocket: 0xff7a2a, ludicrous: 0xff3fa8 };
 
@@ -82,6 +104,8 @@ export class Game {
   private runTicket: Promise<string | null> = Promise.resolve(null);
 
   private state: State = 'menu';
+  /** Admin free-drive mode: no traffic collision and no riding on vehicle roofs. */
+  private adminMode = false;
   private stateT = 0;
   private speed = 0;
   private distance = 0;
@@ -93,10 +117,26 @@ export class Game {
   private orbChain = 0;
   private lastOrbT = -1;
   private lowAirWarned = false;
-  private records = loadJSON(STORAGE_KEY, { bestScore: 0, bestDistance: 0 });
-  // `named` is set once the player has picked a pilot name (until then the menu asks for one).
-  private settings = loadJSON<{ muted: boolean; car: CarId; named?: boolean }>(SETTINGS_KEY, { muted: false, car: DEFAULT_CAR });
+  /** `totalDistance` is lifetime metres driven, which unlocks paint shop finishes. */
+  private records = loadJSON(STORAGE_KEY, { bestScore: 0, bestDistance: 0, totalDistance: 0 });
+  private settings = loadJSON<Settings>(SETTINGS_KEY, { muted: false, car: DEFAULT_CAR, haptics: true, finishes: {} });
+  private readonly haptics: Haptics;
+
+  // Photo mode: where to return to, and the orbit camera around the car.
+  private photoFrom: State = 'paused';
+  private photoYaw = 0;
+  private photoPitch = 0.3;
+  private photoDist = 8;
+  private readonly photoPointers = new Map<number, { x: number; y: number }>();
+  private photoPinch = 0;
+  private photoBusy = false;
   private lastFrame = performance.now();
+  private readonly maxPixelRatio = Math.min(window.devicePixelRatio, IS_TOUCH ? 1.5 : 1.75);
+  /** Render scale against maxPixelRatio, lowered when frames run slow and raised again when they recover. */
+  private resScale = 1;
+  private resTime = 0;
+  private resFrames = 0;
+  private resFastWindows = 0;
 
   private readonly camPos = new THREE.Vector3(0, 3, 8);
   private readonly camLook = new THREE.Vector3(0, 1, -14);
@@ -119,7 +159,7 @@ export class Game {
     installWorldBend();
     // Anti-aliasing happens in the post pipeline's multisampled render target instead.
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, IS_TOUCH ? 1.5 : 1.75));
+    this.renderer.setPixelRatio(this.maxPixelRatio);
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -135,10 +175,12 @@ export class Game {
     this.pickups = new Pickups(this.scene);
     this.effects = new Effects(this.scene);
     this.scene.add(this.player.object);
+    this.settings.finishes ??= {};
+    this.haptics = new Haptics(this.settings.haptics !== false);
 
     this.sfx = new Sfx(this.settings.muted);
     this.input.onGesture = () => this.sfx.unlock();
-    this.input.attachGestures(canvas, (side) => this.hud.laneFlash(side));
+    this.input.attachGestures(canvas);
 
     this.hud = new Hud({
       play: () => this.start(),
@@ -147,12 +189,25 @@ export class Game {
       pause: () => this.setPaused(true),
       mute: () => this.toggleMute(),
       touch: (action, down) => this.input.touch(action, down),
-      flick: (dir) => this.input.press(dir),
       car: (step) => this.cycleCar(step),
       callsign: () => this.pilot && this.callsignDialog.open(this.pilot.callsign),
       share: () => void this.share(),
+      paint: () => this.togglePaintShop(),
+      pick: (kind, id) => this.pickFinish(kind, id),
+      howTo: (open) => this.setHowTo(open),
+      photo: () => this.enterPhoto(),
+      photoSave: () => void this.savePhoto(),
+      photoBack: () => this.exitPhoto(),
+      haptics: () => this.toggleHaptics(),
     });
     this.hud.setMuted(this.settings.muted);
+    this.hud.setHaptics(this.haptics.enabled);
+    this.input.onGamepad = (on) => {
+      this.hud.toast(on ? 'Controller connected' : 'Controller disconnected');
+      if (on) this.haptics.buzz('ui');
+    };
+    this.input.onDevice = (pad) => this.hud.setPad(pad);
+    this.attachPhotoControls(canvas);
     this.selectCar(isCarId(this.settings.car) ? this.settings.car : DEFAULT_CAR);
 
     this.callsignDialog = new CallsignDialog(this.board, (callsign) => {
@@ -213,14 +268,41 @@ export class Game {
 
   run() {
     const frame = (now: number) => {
-      const dt = clamp((now - this.lastFrame) / 1000, 0, MAX_DT);
+      const raw = (now - this.lastFrame) / 1000;
+      const dt = clamp(raw, 0, MAX_DT);
       this.lastFrame = now;
+      this.adaptResolution(raw);
       this.update(dt);
       this.renderFrame();
       this.input.endFrame();
       requestAnimationFrame(frame);
     };
     requestAnimationFrame(frame);
+  }
+
+  /**
+   * Keeps the frame rate up on slower GPUs by rendering fewer pixels: drops the resolution a step when a
+   * two-second window averages under ~48 fps, and creeps back up after two windows at a full 60.
+   */
+  private adaptResolution(frame: number) {
+    if (frame > 0.25 || document.hidden) return; // a stall or a background tab says nothing about the GPU
+    this.resTime += frame;
+    this.resFrames++;
+    if (this.resTime < RES_WINDOW) return;
+    const avg = this.resTime / this.resFrames;
+    this.resTime = this.resFrames = 0;
+    let next = this.resScale;
+    if (avg > SLOW_FRAME) {
+      next = Math.max(RES_MIN, this.resScale - 0.15);
+      this.resFastWindows = 0;
+    } else if (avg < FAST_FRAME && ++this.resFastWindows >= 2) {
+      next = Math.min(1, this.resScale + 0.1);
+      this.resFastWindows = 0;
+    }
+    if (Math.abs(next - this.resScale) < 1e-3) return;
+    this.resScale = next;
+    this.renderer.setPixelRatio(this.maxPixelRatio * next);
+    this.resize();
   }
 
   renderFrame() {
@@ -243,6 +325,7 @@ export class Game {
       item: this.powers.item,
       shield: this.powers.shield,
       rocket: +this.powers.rocketMeter.toFixed(2),
+      adminMode: this.adminMode,
       zone: zoneAt(this.distance).zone.name,
     };
   }
@@ -288,13 +371,15 @@ export class Game {
   private toMenu() {
     this.resetRun(1);
     this.speed = 0;
-    this.hud.setMenuStats(this.records.bestScore, this.records.bestDistance);
+    this.hud.setMenuStats(this.records.bestScore, this.records.bestDistance, this.km);
     this.setState('menu');
     this.hud.show('menu');
   }
 
   private setPaused(paused: boolean) {
     if (paused && this.state === 'playing') {
+      const zone = zoneAt(this.distance).zone.name;
+      this.hud.setPauseLine(`${zone} · ${Math.floor(this.distance).toLocaleString()} m · ${this.score.toLocaleString()} pts`);
       this.setState('paused');
       this.hud.show('paused');
     } else if (!paused && this.state === 'paused') {
@@ -307,16 +392,108 @@ export class Game {
   private cycleCar(step: -1 | 1) {
     if (this.state !== 'menu') return;
     const i = CARS.findIndex((c) => c.id === this.settings.car);
-    this.selectCar(CARS[(i + step + CARS.length) % CARS.length].id);
+    this.selectCar(CARS[(i + step + CARS.length) % CARS.length].id, step);
     this.sfx.click();
+    this.haptics.buzz('ui');
   }
 
-  private selectCar(id: CarId) {
+  private selectCar(id: CarId, step: -1 | 1 = 1) {
     this.player.setCar(id);
     this.settings.car = id;
     saveJSON(SETTINGS_KEY, this.settings);
     const design = carDesign(id);
-    this.hud.setCar(design.name, design.tagline);
+    this.hud.setCar(design.name, design.tagline, CARS.findIndex((c) => c.id === id), CARS.length, step);
+    this.applyFinish();
+    if (this.hud.paintShopOpen) this.renderShop();
+  }
+
+  private toggleHaptics() {
+    this.haptics.enabled = !this.haptics.enabled;
+    this.settings.haptics = this.haptics.enabled;
+    saveJSON(SETTINGS_KEY, this.settings);
+    this.hud.setHaptics(this.haptics.enabled);
+    this.haptics.buzz('ui');
+    this.sfx.click();
+  }
+
+  // ---------- paint shop ----------
+
+  private get km() {
+    return this.records.totalDistance / 1000;
+  }
+
+  private finishOf(id: CarId) {
+    const f = this.settings.finishes[id];
+    // A pick that has since become locked (or no longer exists) falls back to factory.
+    const paint = paintItem(f?.paint);
+    const wheels = wheelItem(f?.wheels);
+    return { paint: this.km >= paint.km ? paint : PAINTS[0], wheels: this.km >= wheels.km ? wheels : WHEELS[0] };
+  }
+
+  private applyFinish() {
+    const { paint, wheels } = this.finishOf(this.settings.car);
+    this.player.setFinish(paint.finish, wheels.finish);
+  }
+
+  private renderShop(message?: string) {
+    const { paint, wheels } = this.finishOf(this.settings.car);
+    this.hud.renderPaintShop({ design: carDesign(this.settings.car), paint: paint.id, wheels: wheels.id, km: this.km }, message);
+  }
+
+  private togglePaintShop() {
+    if (this.state !== 'menu') return;
+    const open = !this.hud.paintShopOpen;
+    this.hud.setPaintShop(open);
+    if (open) this.renderShop();
+    this.sfx.click();
+  }
+
+  private pickFinish(kind: FinishKind, id: string) {
+    const item = kind === 'paint' ? paintItem(id) : wheelItem(id);
+    if (this.km < item.km) {
+      const left = Math.max(0.1, item.km - this.km);
+      this.renderShop(`Drive ${left < 10 ? left.toFixed(1) : Math.ceil(left)} km more to unlock ${item.name}.`);
+      this.haptics.buzz('ui');
+      return;
+    }
+    const car = this.settings.car;
+    const current = this.finishOf(car);
+    this.settings.finishes[car] = {
+      paint: kind === 'paint' ? item.id : current.paint.id,
+      wheels: kind === 'wheels' ? item.id : current.wheels.id,
+    };
+    saveJSON(SETTINGS_KEY, this.settings);
+    this.applyFinish();
+    this.renderShop();
+    this.sfx.click();
+    this.haptics.buzz('ui');
+  }
+
+  /** Arrows and controller in the paint shop: the cursor moves along a row, trying on each finish it reaches. */
+  private stepFinish(step: -1 | 1) {
+    const pick = this.hud.shopStep(step);
+    if (pick) this.pickFinish(pick.kind, pick.id);
+  }
+
+  private setHowTo(open: boolean) {
+    if (open && this.state !== 'menu' && this.state !== 'paused') return;
+    if (open === this.hud.howToOpen) return;
+    this.hud.setHowTo(open);
+    this.sfx.click();
+  }
+
+  /** Arrow / d-pad step through a list menu, with a tick. */
+  private navigate(step: -1 | 1) {
+    if (!this.hud.navigate(step)) return;
+    this.sfx.click();
+    this.haptics.buzz('ui');
+  }
+
+  /** Lists finishes that a run's distance just unlocked. */
+  private unlockedBetween(beforeKm: number, afterKm: number) {
+    return [...PAINTS.map((p) => ({ ...p, kind: 'paint' })), ...WHEELS.map((w) => ({ ...w, kind: 'wheels' }))].filter(
+      (i) => i.km > beforeKm && i.km <= afterKm,
+    );
   }
 
   private toggleMute() {
@@ -324,6 +501,13 @@ export class Game {
     saveJSON(SETTINGS_KEY, this.settings);
     this.sfx.setMuted(this.settings.muted);
     this.hud.setMuted(this.settings.muted);
+  }
+
+  private toggleAdminMode() {
+    this.adminMode = !this.adminMode;
+    this.hud.setAdminMode(this.adminMode);
+    this.hud.toast(this.adminMode ? 'ADMIN FREE DRIVE ON · TRAFFIC PHASED' : 'ADMIN FREE DRIVE OFF', 3000);
+    this.haptics.buzz('ui');
   }
 
   private setState(state: State) {
@@ -337,26 +521,58 @@ export class Game {
   private update(dt: number) {
     this.stateT += dt;
     const input = this.input;
-    let confirm = input.wasPressed('jump') || input.wasPressed('confirm');
+    input.pollGamepad();
+    this.haptics.pad = input.gamepad;
+    this.haptics.phone = input.touchMode;
     if (this.callsignDialog.isOpen) {
       // The name dialog swallows game input.
       input.endFrame();
-      confirm = false;
+    }
+    if (input.wasPressed('adminToggle')) {
+      if (this.hud.paintShopOpen) this.togglePaintShop();
+      this.toggleAdminMode();
     }
     if (input.wasPressed('mute')) this.toggleMute();
+    if (this.hud.howToOpen) {
+      if (input.wasPressed('back') || input.wasPressed('pause') || input.wasPressed('confirm')) this.setHowTo(false);
+      input.endFrame();
+    }
+    // List menus: ↑ / ↓ (d-pad, stick) move the highlight and Enter / Space / A picks it.
+    const confirm = input.wasPressed('confirm');
+    const nav = input.wasPressed('menuUp') ? -1 : input.wasPressed('menuDown') ? 1 : 0;
 
     switch (this.state) {
       case 'menu':
-        if (confirm) this.start();
+        if (this.hud.paintShopOpen) {
+          if (input.wasPressed('back') || input.wasPressed('paint') || confirm) this.togglePaintShop();
+          else if (input.wasPressed('left')) this.stepFinish(-1);
+          else if (input.wasPressed('right')) this.stepFinish(1);
+          else if (nav && this.hud.shopRowStep(nav)) this.sfx.click();
+        } else if (confirm) this.hud.activate();
+        else if (nav) this.navigate(nav);
         else if (input.wasPressed('left')) this.cycleCar(-1);
         else if (input.wasPressed('right')) this.cycleCar(1);
+        else if (input.wasPressed('paint')) this.togglePaintShop();
         break;
       case 'paused':
-        if (input.wasPressed('pause') || input.wasPressed('confirm')) this.setPaused(false);
+        if (input.wasPressed('photo')) this.enterPhoto();
+        else if (input.wasPressed('pause')) this.setPaused(false);
+        else if (confirm) this.hud.activate();
+        else if (nav) this.navigate(nav);
+        break;
+      case 'photo':
+        // The arrows steer the camera here, so only Esc / P / Start / B leave and Enter / A takes the shot.
+        if (input.wasPressed('pause') || input.wasPressed('back')) this.exitPhoto();
+        else if (input.wasPressed('confirm')) void this.savePhoto();
         break;
       case 'over':
-        if (confirm && this.stateT > 0.25) this.start();
-        else if (input.wasPressed('pause')) this.toMenu();
+        // A short grace period, so a key still held from the crash doesn't pick an item.
+        if (this.stateT > 0.25) {
+          if (input.wasPressed('photo')) this.enterPhoto();
+          else if (confirm) this.hud.activate();
+          else if (input.wasPressed('pause') || input.wasPressed('back')) this.toMenu();
+          else if (nav) this.navigate(nav);
+        }
         this.simulate(dt, false);
         break;
       case 'crashing':
@@ -368,10 +584,22 @@ export class Game {
           this.setPaused(true);
           break;
         }
-        if (input.wasPressed('left')) this.player.steer(-1);
-        if (input.wasPressed('right')) this.player.steer(1);
-        if (input.wasPressed('jump')) this.player.pressJump();
-        if (input.wasPressed('down')) this.player.slam();
+        if (input.wasPressed('left')) {
+          this.player.steer(-1);
+          this.hud.laneFlash('left');
+        }
+        if (input.wasPressed('right')) {
+          this.player.steer(1);
+          this.hud.laneFlash('right');
+        }
+        if (input.wasPressed('jump')) {
+          this.player.pressJump();
+          this.hud.laneFlash('up');
+        }
+        if (input.wasPressed('down')) {
+          this.player.slam();
+          this.hud.laneFlash('down');
+        }
         if (input.wasPressed('item')) this.useItem();
         this.simulate(dt, true);
         // The soundtrack builds up on a streak or in a power mode.
@@ -379,11 +607,13 @@ export class Game {
         break;
     }
 
-    const frozen = this.state === 'menu' || this.state === 'paused';
+    const photo = this.state === 'photo';
+    const frozen = this.state === 'menu' || this.state === 'paused' || photo;
     const p = this.player;
     this.updateCamera(dt);
     this.env.update(dt, frozen ? 0 : this.speed * dt, p.x, this.camera);
-    this.updateWorld(dt, frozen);
+    // Photo mode stops the clock for the whole world: rain, birds and the grade's grain hold still.
+    this.updateWorld(photo ? 0 : dt, frozen);
     if (!frozen) this.effects.update(dt, p, this.speed, this.powers.power, this.camera, this.canvas.height);
     this.sfx.update({
       active: this.state === 'playing',
@@ -413,7 +643,7 @@ export class Game {
     this.pickups.update(dt, this.speed * dt, this.distance, live);
 
     const box = { x: p.x, y: p.y, width: p.width, length: p.length };
-    const ground = live ? this.traffic.roofUnder(box) : 0;
+    const ground = live && !this.adminMode ? this.traffic.roofUnder(box) : 0;
     p.rocket = powers.power === 'rocket';
     p.autoFlip = this.input.touchMode;
     p.update(dt, ground, this.speed, this.input.isHeld('jump'), this.input.isHeld('boost'));
@@ -425,7 +655,7 @@ export class Game {
 
     box.x = p.x;
     box.y = p.y;
-    const hit = this.traffic.hit(box);
+    const hit = this.adminMode ? null : this.traffic.hit(box);
     if (hit) {
       if (powers.invincible) {
         this.smash(hit, true);
@@ -433,6 +663,7 @@ export class Game {
         p.setShield(false);
         this.hud.setShield(false);
         this.sfx.shieldBreak();
+        this.haptics.buzz('shield');
         this.hud.popup('SHIELD SAVE', 0, 'great');
         this.smash(hit, false);
       } else {
@@ -508,6 +739,7 @@ export class Game {
     this.smokeTint.setRGB(0.86, 0.87, 0.9).lerp(pal.hemiSky, 1 - daylight).multiplyScalar(daylight);
     this.smokeSun.copy(pal.sun).multiplyScalar(pal.sunIntensity * 0.3 * (1 - this.structures.shade));
     this.player.setSmokeLight(this.smokeTint, this.smokeSun, this.sunDir);
+    this.player.setNight(Math.max(pal.stars, this.structures.shade));
     this.effects.setSmokeTint(this.smokeTint);
     this.road.applyPalette(this.palette);
   }
@@ -519,6 +751,7 @@ export class Game {
     if (e.type === 'near') {
       this.effects.nearMiss(this.player.x, v.x);
       this.sfx.nearMiss();
+      this.haptics.buzz('near');
       this.addSkill('NEAR MISS', POINTS.nearMiss, 'good', ROCKET_FILL.nearMiss);
     } else {
       if (v.big) this.addSkill(v.kind === 'semi' ? 'SEMI CLEARED' : 'BUS CLEARED', POINTS.clearedBig, 'great', ROCKET_FILL.cleared);
@@ -535,6 +768,7 @@ export class Game {
         break;
       case 'land':
         this.sfx.land(e.impact);
+        this.haptics.buzz('land', clamp((e.impact - 5) / 25, 0, 1));
         this.effects.landing(p.x, p.y, e.impact);
         this.shake = Math.max(this.shake, clamp((e.impact - 8) / 30, 0, 0.45));
         break;
@@ -566,6 +800,7 @@ export class Game {
       powers.chargeRocket(ROCKET_FILL.orb);
       this.effects.pickup(p.x, p.y + 0.8, 0x7fe6ff, 6);
       this.sfx.orb(this.orbChain);
+      this.haptics.buzz('pickup', 0.6);
       return;
     }
     if (kind === 'star') {
@@ -576,6 +811,7 @@ export class Game {
 
     const style = ITEM_STYLE[kind];
     this.effects.pickup(p.x, p.y + 0.8, style.color, 20);
+    this.haptics.buzz('pickup');
     switch (kind) {
       case 'airCan':
         p.addAir(PICKUPS.airCan);
@@ -616,6 +852,7 @@ export class Game {
     for (const v of cars) this.smash(v, false);
     this.effects.shockwave(this.player.x);
     this.sfx.shockwave();
+    this.haptics.buzz('shockwave');
     this.shake = Math.max(this.shake, 0.6);
     if (cars.length > 0) this.addSkill(`SHOCKWAVE ×${cars.length}`, SHOCKWAVE.points * cars.length, 'great');
     else this.hud.popup('SHOCKWAVE', 0, 'good');
@@ -624,6 +861,7 @@ export class Game {
   private onPowerEvent(e: PowerEvent) {
     if (e.type === 'start') {
       this.sfx.powerStart();
+      this.haptics.buzz('power');
       this.shake = Math.max(this.shake, 0.4);
       const label = e.power === 'starman' ? '★ STARMAN' : e.power === 'rocket' ? 'ROCKET MODE' : 'LUDICROUS';
       this.hud.popup(label, 0, 'great');
@@ -667,6 +905,7 @@ export class Game {
     this.traffic.smash(v, this.player.x);
     this.effects.smash(v.x, 0, v.z);
     this.sfx.smash();
+    this.haptics.buzz('smash');
     this.shake = Math.max(this.shake, 0.35);
     if (award) this.addSkill('SMASH', SMASH_POINTS, 'great');
   }
@@ -678,6 +917,7 @@ export class Game {
     this.combo.reset();
     this.effects.crash(this.player.x, this.player.y);
     this.sfx.crash();
+    this.haptics.buzz('crash');
     this.shake = 0.8;
     this.canvas.classList.add('crashed');
     this.hud.update(this.distance, this.score, this.player.air, false);
@@ -689,11 +929,18 @@ export class Game {
   private gameOver() {
     const score = this.score;
     const isRecord = score > this.records.bestScore;
+    const kmBefore = this.km;
     this.records = {
       bestScore: Math.max(score, this.records.bestScore),
       bestDistance: Math.max(Math.floor(this.distance), this.records.bestDistance),
+      totalDistance: this.records.totalDistance + Math.floor(this.distance),
     };
     saveJSON(STORAGE_KEY, this.records);
+    const unlocked = this.unlockedBetween(kmBefore, this.km);
+    if (unlocked.length) {
+      const names = unlocked.map((u) => `${u.name}${u.kind === 'wheels' ? ' wheels' : ''}`).join(', ');
+      this.hud.toast(`Paint shop unlocked: ${names}`, 4200);
+    }
     this.setState('over');
     this.hud.setLine('over-rank', '');
     this.hud.setLine('over-challenge', this.challengeLine(score));
@@ -704,7 +951,7 @@ export class Game {
       time: this.runTime,
       best: this.records.bestScore,
       isRecord,
-      reason: 'COLLISION',
+      reason: `Crashed · ${zoneAt(this.distance).zone.name}`,
     });
   }
 
@@ -738,6 +985,175 @@ export class Game {
     });
     if (result === 'copied') this.hud.setLine('over-rank', 'Link copied — send it to a friend!');
     else if (result === 'failed') this.hud.setLine('over-rank', 'Could not share from this browser.');
+  }
+
+  // ---------- photo mode ----------
+
+  /** Freezes the world and hands the camera over to an orbit around the car. */
+  private enterPhoto() {
+    if (this.state !== 'paused' && this.state !== 'over') return;
+    this.photoFrom = this.state;
+    // Start from where the chase camera already is, so the view doesn't jump.
+    const p = this.player;
+    const off = this.camera.position.clone().sub(this.photoTarget());
+    this.photoDist = clamp(off.length(), PHOTO_DIST[0], PHOTO_DIST[1]);
+    this.photoYaw = Math.atan2(off.x, off.z);
+    this.photoPitch = clamp(Math.asin(clamp(off.y / Math.max(off.length(), 1e-3), -1, 1)), PHOTO_PITCH[0], PHOTO_PITCH[1]);
+    this.lastPlayerX = p.x;
+    this.setState('photo');
+    this.sfx.musicDucked(true);
+    this.hud.show('photo');
+    this.hud.toast('Photo mode', 1200);
+  }
+
+  private exitPhoto() {
+    if (this.state !== 'photo') return;
+    this.photoPointers.clear();
+    const back = this.photoFrom;
+    this.setState(back);
+    if (back === 'over') this.hud.show('over');
+    else this.hud.show('paused');
+  }
+
+  private photoTarget() {
+    return new THREE.Vector3(this.player.x, this.player.y + this.player.car.height * 0.45, 0);
+  }
+
+  private photoCamera(dt: number) {
+    const input = this.input;
+    const a = input.analog;
+    // Keyboard arrows / WASD and either stick orbit; up/down tilts. Triggers zoom.
+    const turn = (input.isHeld('right') ? 1 : 0) - (input.isHeld('left') ? 1 : 0) + a.lx + a.rx;
+    const tilt = (input.isHeld('jump') ? 1 : 0) - (input.isHeld('down') ? 1 : 0) - a.ly - a.ry;
+    this.photoYaw += turn * dt * 1.6;
+    this.photoPitch = clamp(this.photoPitch + tilt * dt * 1.1, PHOTO_PITCH[0], PHOTO_PITCH[1]);
+    this.photoDist = clamp(this.photoDist * Math.exp(-a.zoom * dt * 1.4), PHOTO_DIST[0], PHOTO_DIST[1]);
+
+    const cam = this.camera;
+    const target = this.photoTarget();
+    const r = this.photoDist;
+    cam.position.set(
+      target.x + Math.sin(this.photoYaw) * Math.cos(this.photoPitch) * r,
+      Math.max(0.25, target.y + Math.sin(this.photoPitch) * r),
+      target.z + Math.cos(this.photoYaw) * Math.cos(this.photoPitch) * r,
+    );
+    cam.lookAt(target);
+    cam.fov = damp(cam.fov, 50, 6, dt);
+    cam.filmOffset = 0;
+    cam.updateProjectionMatrix();
+  }
+
+  /** Mouse drag / one finger orbits, the wheel or a pinch zooms. Only active in photo mode. */
+  private attachPhotoControls(canvas: HTMLCanvasElement) {
+    const pinchDist = () => {
+      const [a, b] = [...this.photoPointers.values()];
+      return Math.hypot(a.x - b.x, a.y - b.y);
+    };
+    canvas.addEventListener('pointerdown', (e) => {
+      if (this.state !== 'photo') return;
+      this.photoPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (this.photoPointers.size === 2) this.photoPinch = pinchDist();
+    });
+    canvas.addEventListener('pointermove', (e) => {
+      const last = this.photoPointers.get(e.pointerId);
+      if (this.state !== 'photo' || !last) return;
+      if (this.photoPointers.size === 1) {
+        this.photoYaw -= (e.clientX - last.x) * 0.006;
+        this.photoPitch = clamp(this.photoPitch + (e.clientY - last.y) * 0.005, PHOTO_PITCH[0], PHOTO_PITCH[1]);
+      }
+      last.x = e.clientX;
+      last.y = e.clientY;
+      if (this.photoPointers.size === 2) {
+        const d = pinchDist();
+        if (this.photoPinch > 0) this.photoDist = clamp((this.photoDist * this.photoPinch) / d, PHOTO_DIST[0], PHOTO_DIST[1]);
+        this.photoPinch = d;
+      }
+    });
+    const up = (e: PointerEvent) => {
+      this.photoPointers.delete(e.pointerId);
+      this.photoPinch = 0;
+    };
+    canvas.addEventListener('pointerup', up);
+    canvas.addEventListener('pointercancel', up);
+    canvas.addEventListener(
+      'wheel',
+      (e) => {
+        if (this.state !== 'photo') return;
+        e.preventDefault();
+        this.photoDist = clamp(this.photoDist * Math.exp(e.deltaY * 0.0012), PHOTO_DIST[0], PHOTO_DIST[1]);
+      },
+      { passive: false },
+    );
+  }
+
+  /**
+   * Renders the frame, copies it straight off the WebGL canvas (before the browser clears it), stamps a
+   * small caption in the corner and saves it as a PNG, or offers the share sheet on phones.
+   */
+  private async savePhoto() {
+    if (this.state !== 'photo' || this.photoBusy) return;
+    this.photoBusy = true;
+    this.hud.photoSaving(true);
+    try {
+      this.renderFrame();
+      const src = this.renderer.domElement;
+      const shot = document.createElement('canvas');
+      shot.width = src.width;
+      shot.height = src.height;
+      const ctx = shot.getContext('2d')!;
+      ctx.drawImage(src, 0, 0);
+      this.stampPhoto(ctx, shot.width, shot.height);
+      const blob = await new Promise<Blob | null>((r) => shot.toBlob(r, 'image/png'));
+      if (!blob) throw new Error('capture failed');
+      const name = `drive-roadster-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.png`;
+      const file = new File([blob], name, { type: 'image/png' });
+      if (this.input.touchMode && navigator.canShare?.({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file], title: 'Drive Roadster' });
+        } catch {
+          // Cancelled share sheet: nothing saved, nothing to report.
+        }
+      } else {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = name;
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+        this.hud.toast('Photo saved', 1600);
+      }
+      this.sfx.click();
+      this.haptics.buzz('ui');
+    } catch {
+      this.hud.toast('Could not save the photo in this browser', 2600);
+    } finally {
+      this.hud.photoSaving(false);
+      this.photoBusy = false;
+    }
+  }
+
+  /** The caption: game name, then the car, zone and distance of the moment. */
+  private stampPhoto(ctx: CanvasRenderingContext2D, w: number, h: number) {
+    const u = h / 720;
+    const pad = 26 * u;
+    const line2 = `${carDesign(this.settings.car).name} · ${zoneAt(this.distance).zone.name} · ${Math.floor(this.distance).toLocaleString()} m`;
+    ctx.save();
+    const grad = ctx.createLinearGradient(0, h - 120 * u, 0, h);
+    grad.addColorStop(0, 'rgba(0,0,0,0)');
+    grad.addColorStop(1, 'rgba(0,0,0,0.45)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, h - 120 * u, w, 120 * u);
+    ctx.shadowColor = 'rgba(0,0,0,0.6)';
+    ctx.shadowBlur = 8 * u;
+    ctx.fillStyle = '#ff3b4e';
+    ctx.fillRect(pad, h - pad - 52 * u, 4 * u, 46 * u);
+    ctx.fillStyle = '#f6f1ea';
+    ctx.font = `italic 800 ${30 * u}px 'Barlow Condensed', system-ui, sans-serif`;
+    ctx.fillText('DRIVE ROADSTER', pad + 14 * u, h - pad - 26 * u);
+    ctx.font = `500 ${15 * u}px 'Barlow', system-ui, sans-serif`;
+    ctx.fillStyle = 'rgba(246,241,234,0.8)';
+    ctx.fillText(line2, pad + 14 * u, h - pad - 5 * u);
+    ctx.restore();
   }
 
   // ---------- camera ----------
@@ -775,6 +1191,10 @@ export class Game {
       return;
     }
     if (this.state === 'paused') return;
+    if (this.state === 'photo') {
+      this.photoCamera(dt);
+      return;
+    }
 
     const speedK = clamp((this.speed - 25) / 75, 0, 1);
     const rate = this.state === 'playing' && this.stateT < 1 ? 4 : 7;

@@ -1,9 +1,25 @@
-export type Action = 'left' | 'right' | 'jump' | 'down' | 'boost' | 'item' | 'pause' | 'confirm' | 'mute';
+export type Action =
+  | 'left'
+  | 'right'
+  | 'jump'
+  | 'down'
+  | 'boost'
+  | 'item'
+  | 'pause'
+  | 'confirm'
+  | 'mute'
+  | 'paint'
+  | 'photo'
+  // Menus: move the highlight, and go back a level.
+  | 'menuUp'
+  | 'menuDown'
+  | 'back'
+  | 'adminToggle';
 export type TouchAction = 'left' | 'right' | 'jump' | 'down' | 'boost' | 'item';
 
 // Gestures on the game view (see attachGestures).
 /** Travel (px) that turns a touch into a swipe; a long sideways drag changes lane again every SWIPE_PX. */
-const SWIPE_PX = 34;
+const SWIPE_PX = 42;
 /** A finger that stays put this long (ms) is a hold: it boosts for as long as it stays down. */
 const HOLD_MS = 170;
 /** Movement (px) a hold or a tap may wobble by and still count as one. */
@@ -15,31 +31,87 @@ export const IS_TOUCH =
   matchMedia('(hover: none)').matches ||
   (import.meta.env.DEV && new URLSearchParams(location.search).has('touch'));
 
-const KEYMAP: Record<string, Action> = {
-  ArrowLeft: 'left',
-  KeyA: 'left',
-  ArrowRight: 'right',
-  KeyD: 'right',
-  ArrowUp: 'jump',
-  KeyW: 'jump',
-  Space: 'jump',
-  ArrowDown: 'down',
-  KeyS: 'down',
-  ShiftLeft: 'boost',
-  ShiftRight: 'boost',
-  KeyP: 'pause',
-  Escape: 'pause',
-  Enter: 'confirm',
-  KeyM: 'mute',
-  KeyZ: 'item',
-  KeyE: 'item',
+/** Keys and what they do; some do one thing while driving and another in the menus. */
+const KEYMAP: Record<string, Action[]> = {
+  ArrowLeft: ['left'],
+  KeyA: ['left'],
+  ArrowRight: ['right'],
+  KeyD: ['right'],
+  ArrowUp: ['jump', 'menuUp'],
+  KeyW: ['jump', 'menuUp'],
+  Space: ['jump', 'confirm'],
+  ArrowDown: ['down', 'menuDown'],
+  KeyS: ['down', 'menuDown'],
+  ShiftLeft: ['boost'],
+  ShiftRight: ['boost'],
+  KeyP: ['pause'],
+  Escape: ['pause', 'back'],
+  Backspace: ['back'],
+  Enter: ['confirm'],
+  KeyM: ['mute'],
+  KeyZ: ['item'],
+  KeyE: ['item'],
+  KeyV: ['paint'],
+  KeyC: ['photo'],
 };
+
+/**
+ * Controller buttons in the browser's "standard" layout (Xbox naming): A jumps, B slams, X uses the
+ * item, Y opens photo mode, the bumpers and triggers boost. In the menus A picks, B goes back, and
+ * the d-pad or left stick moves the highlight (up / down) and changes car (left / right).
+ */
+const PAD_BUTTONS: Record<number, Action[]> = {
+  0: ['jump', 'confirm'],
+  1: ['down', 'back'],
+  2: ['item'],
+  3: ['photo'],
+  4: ['boost'],
+  5: ['boost'],
+  6: ['boost'],
+  7: ['boost'],
+  8: ['mute'],
+  9: ['pause'],
+  12: ['jump', 'menuUp'],
+  13: ['down', 'menuDown'],
+  14: ['left'],
+  15: ['right'],
+};
+
+/** Stick travel that counts as a push, and the travel it must fall back under before the next one. */
+const STICK_ON = 0.6;
+const STICK_OFF = 0.35;
+const DEADZONE = 0.15;
+
+const dead = (v: number) => (Math.abs(v) < DEADZONE ? 0 : (v - Math.sign(v) * DEADZONE) / (1 - DEADZONE));
+
+/** Analog controller state, for photo mode's free camera. */
+export interface Analog {
+  lx: number;
+  ly: number;
+  rx: number;
+  ry: number;
+  /** Right trigger minus left trigger. */
+  zoom: number;
+}
 
 /** Keyboard state: `held` for continuous actions, `pressed` for edges within the current frame. */
 export class Input {
   private readonly held = new Set<Action>();
   private readonly pressed = new Set<Action>();
   private touched = false;
+  private readonly padHeld = new Set<Action>();
+  private readonly padPrev: boolean[] = [];
+  private stickSide = 0;
+  private stickVert = 0;
+  /** The controller in use, if any; its motors carry the rumble. */
+  gamepad: Gamepad | null = null;
+  readonly analog: Analog = { lx: 0, ly: 0, rx: 0, ry: 0, zoom: 0 };
+  /** Called when a controller is plugged in (true) or removed (false). */
+  onGamepad: ((connected: boolean, name: string) => void) | null = null;
+  /** Called when play switches between the keyboard and a controller, so prompts can show its buttons. */
+  onDevice: ((pad: boolean) => void) | null = null;
+  private padInUse = false;
+  private adminCodeProgress = 0;
 
   /** Called on the first key press or tap, e.g. to unlock audio (browsers need a user gesture). */
   onGesture: (() => void) | null = null;
@@ -50,17 +122,116 @@ export class Input {
     target.addEventListener('keydown', (e) => {
       this.onGesture?.();
       if (typing(e)) return;
-      const action = KEYMAP[e.code];
-      if (!action) return;
+      const actions = KEYMAP[e.code];
+      if (!e.repeat && this.trackAdminCode(e.code)) this.pressed.add('adminToggle');
+      if (!actions) return;
       e.preventDefault();
-      if (!e.repeat) this.pressed.add(action);
-      this.held.add(action);
+      this.usePad(false);
+      for (const action of actions) {
+        if (!e.repeat) this.pressed.add(action);
+        this.held.add(action);
+      }
     });
     target.addEventListener('keyup', (e) => {
-      const action = KEYMAP[e.code];
-      if (action) this.held.delete(action);
+      for (const action of KEYMAP[e.code] ?? []) this.held.delete(action);
     });
-    target.addEventListener('blur', () => this.held.clear());
+    target.addEventListener('blur', () => {
+      this.held.clear();
+      this.adminCodeProgress = 0;
+    });
+    target.addEventListener('gamepadconnected', (e) => this.onGamepad?.(true, (e as GamepadEvent).gamepad.id));
+    target.addEventListener('gamepaddisconnected', (e) => {
+      if (this.gamepad?.index === (e as GamepadEvent).gamepad.index) {
+        this.gamepad = null;
+        for (const a of this.padHeld) this.held.delete(a);
+        this.padHeld.clear();
+        this.usePad(false);
+      }
+      this.onGamepad?.(false, (e as GamepadEvent).gamepad.id);
+    });
+  }
+
+  /**
+   * Reads the controller once a frame (browsers only report pads by polling): new button presses become
+   * actions, held buttons hold, and the left stick changes lane with a push to either side.
+   */
+  pollGamepad() {
+    const pads = typeof navigator.getGamepads === 'function' ? navigator.getGamepads() : [];
+    let pad: Gamepad | null = null;
+    for (const p of pads) {
+      if (p && p.connected && p.mapping === 'standard') {
+        pad = p;
+        break;
+      }
+      if (p && p.connected && !pad) pad = p;
+    }
+    this.gamepad = pad;
+    const a = this.analog;
+    if (!pad) {
+      a.lx = a.ly = a.rx = a.ry = a.zoom = 0;
+      return;
+    }
+    const nowHeld = new Set<Action>();
+    pad.buttons.forEach((b, i) => {
+      const down = b.pressed || b.value > 0.5;
+      const actions = PAD_BUTTONS[i];
+      if (!actions) return;
+      if (down) for (const act of actions) nowHeld.add(act);
+      if (down && !this.padPrev[i]) {
+        this.onGesture?.();
+        this.usePad(true);
+        for (const act of actions) this.pressed.add(act);
+      }
+      this.padPrev[i] = down;
+    });
+    // Release what the pad no longer holds (keys held on the keyboard stay held).
+    for (const act of this.padHeld) if (!nowHeld.has(act)) this.held.delete(act);
+    for (const act of nowHeld) this.held.add(act);
+    this.padHeld.clear();
+    for (const act of nowHeld) this.padHeld.add(act);
+
+    const ax = pad.axes;
+    a.lx = dead(ax[0] ?? 0);
+    a.ly = dead(ax[1] ?? 0);
+    a.rx = dead(ax[2] ?? 0);
+    a.ry = dead(ax[3] ?? 0);
+    a.zoom = (pad.buttons[7]?.value ?? 0) - (pad.buttons[6]?.value ?? 0);
+    const x = ax[0] ?? 0;
+    if (this.stickSide === 0 && Math.abs(x) > STICK_ON) {
+      this.stickSide = Math.sign(x);
+      this.pressed.add(x < 0 ? 'left' : 'right');
+      this.usePad(true);
+    } else if (this.stickSide !== 0 && Math.abs(x) < STICK_OFF) {
+      this.stickSide = 0;
+    }
+    // Up and down on the stick only move the menu highlight (jumping is a button).
+    const y = ax[1] ?? 0;
+    if (this.stickVert === 0 && Math.abs(y) > STICK_ON && Math.abs(y) > Math.abs(x)) {
+      this.stickVert = Math.sign(y);
+      this.pressed.add(y < 0 ? 'menuUp' : 'menuDown');
+      this.usePad(true);
+    } else if (this.stickVert !== 0 && Math.abs(y) < STICK_OFF) {
+      this.stickVert = 0;
+    }
+  }
+
+  private usePad(pad: boolean) {
+    if (pad === this.padInUse) return;
+    this.padInUse = pad;
+    this.onDevice?.(pad);
+  }
+
+  /** Secret admin shortcut: V, V, B, B. Any other key interrupts the sequence. */
+  private trackAdminCode(code: string) {
+    const sequence = ['KeyV', 'KeyV', 'KeyB', 'KeyB'];
+    if (code === sequence[this.adminCodeProgress]) {
+      this.adminCodeProgress++;
+    } else {
+      this.adminCodeProgress = code === 'KeyV' ? 1 : 0;
+    }
+    if (this.adminCodeProgress < sequence.length) return false;
+    this.adminCodeProgress = 0;
+    return true;
   }
 
   isHeld(action: Action) {
@@ -93,20 +264,21 @@ export class Input {
   }
 
   /**
-   * Gestures on `el` (the game view); the JUMP stick on the right handles jumping and flying:
-   * - swipe left / right: change lane; keep dragging to cross more lanes (a barrel roll in the air)
+   * Gestures on `el` (the game view):
+   * - tap the left / right half or swipe in that direction: step one lane at a time
    * - press and hold: boost while held; slide while holding to change lane
-   * - tap, or swipe up: jump (then tap again in the air to flip)
-   * - swipe down: slam
-   * Each finger is tracked on its own, so gestures and the on-screen controls work together.
+   * - swipe up: jump and hold to hover; release to fall. Swipe down: slam
+   * A plain tap steers but never jumps. Each finger is tracked on its own, so gestures and the on-screen controls
+   * work together.
    */
-  attachGestures(el: HTMLElement, onLane?: (side: 'left' | 'right') => void) {
+  attachGestures(el: HTMLElement) {
     interface Finger {
       x: number; // anchor for the next lane step
       sx: number;
       sy: number;
       swiped: boolean;
       holding: boolean;
+      jumping: boolean;
       timer: number;
     }
     const fingers = new Map<number, Finger>();
@@ -121,9 +293,9 @@ export class Input {
       } catch {
         // Touch pointers are captured by their target anyway; this only matters for a test mouse.
       }
-      const f: Finger = { x: e.clientX, sx: e.clientX, sy: e.clientY, swiped: false, holding: false, timer: 0 };
+      const f: Finger = { x: e.clientX, sx: e.clientX, sy: e.clientY, swiped: false, holding: false, jumping: false, timer: 0 };
       f.timer = window.setTimeout(() => {
-        if (f.swiped) return;
+        if (f.swiped || f.jumping) return;
         f.holding = true;
         this.hold('boost', true);
       }, HOLD_MS);
@@ -139,15 +311,22 @@ export class Input {
       if (Math.abs(dx) >= SWIPE_PX && Math.abs(dx) > Math.abs(dy) * 0.8) {
         const side = dx < 0 ? 'left' : 'right';
         this.press(side);
-        onLane?.(side);
         f.x = e.clientX;
         f.swiped = true;
         return;
       }
-      // Up or down, once per touch, and not while holding (a held thumb drifts).
+      // Vertical gestures are anchored to initial touch; an upward swipe stays held until release,
+      // making jump and hover one continuous, easy-to-understand action.
       if (!f.swiped && !f.holding && Math.abs(dy) >= SWIPE_PX && Math.abs(dy) > Math.abs(e.clientX - f.sx)) {
-        this.press(dy < 0 ? 'jump' : 'down');
-        f.swiped = true;
+        if (dy < 0) {
+          f.jumping = true;
+          f.swiped = true;
+          this.press('jump');
+          this.hold('jump', true);
+        } else {
+          this.press('down');
+          f.swiped = true;
+        }
       }
     });
     const release = (e: PointerEvent) => {
@@ -155,11 +334,12 @@ export class Input {
       if (!f) return;
       fingers.delete(e.pointerId);
       clearTimeout(f.timer);
-      if (f.holding) {
-        // Other fingers may still be holding.
-        if (![...fingers.values()].some((o) => o.holding)) this.hold('boost', false);
-      } else if (!f.swiped && e.type === 'pointerup') {
-        this.press('jump'); // a tap
+      if (f.jumping && ![...fingers.values()].some((o) => o.jumping)) this.hold('jump', false);
+      // Other fingers may still be holding.
+      if (f.holding && ![...fingers.values()].some((o) => o.holding)) this.hold('boost', false);
+      if (e.type === 'pointerup' && !f.swiped && !f.holding && !f.jumping) {
+        const side = e.clientX < window.innerWidth / 2 ? 'left' : 'right';
+        this.press(side);
       }
     };
     el.addEventListener('pointerup', release);

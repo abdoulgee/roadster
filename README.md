@@ -14,19 +14,23 @@ npm run build    # production build in dist/
 
 ## Controls
 
-| Action | Keyboard | Touch |
-| --- | --- | --- |
-| Change lane / barrel roll in the air | ← → (A D) | Push the JUMP stick left / right (also while flying) · or swipe left / right anywhere |
-| Jump · flip | ↑ / Space (W); press again in the air to flip | Touch the JUMP stick (or tap / swipe up anywhere); one flip happens on its own in the air, touch again for more |
-| Fly | Hold ↑ / Space | Keep holding the JUMP stick |
-| Slam down | ↓ (S) | Flick the JUMP stick down · or swipe down anywhere |
-| Boost | Shift | Press and hold anywhere on the screen; slide while holding to change lane |
-| Use item | Z (E) | ITEM, bottom left (shows the held item) |
-| Pause · sound | P / Esc · M | Buttons |
+| Action | Keyboard | Touch | Controller |
+| --- | --- | --- | --- |
+| Change lane / barrel roll in the air | ← → (A D) | Touch the road: the car goes to the lane under your finger · push the stick left / right (also while flying) · or swipe left / right | Left stick · d-pad ← → |
+| Jump · flip | ↑ / Space (W); press again in the air to flip | Push the stick up (or swipe up); one flip happens on its own in the air, push up again for more | A |
+| Fly | Hold ↑ / Space | Keep the stick pushed up | Hold A |
+| Slam down | ↓ (S) | Push the stick down · or swipe down | B · d-pad ↓ |
+| Boost | Shift | Press and hold anywhere on the screen; slide while holding to change lane | RT · LT · RB · LB |
+| Use item | Z (E) | ITEM, bottom left (shows the held item) | X |
+| Pause · sound | P / Esc · M | Buttons | Start · Back |
+| Photo mode (paused or game over) | C; drag / arrows orbit, scroll zooms, Enter saves | PHOTO MODE button; drag orbits, pinch zooms | Y; sticks orbit, triggers zoom, A saves |
+| Menus | ↑ ↓ move, Enter / Space pick, Esc back; ← → change car on the home screen; V opens the paint shop | Tap | D-pad or left stick, A pick, B back |
 
-Phones and tablets get the touch controls automatically (coarse pointer or no hover): ITEM on the
-left, the JUMP analog stick on the right, and gestures anywhere else on the screen. Every finger is
-tracked on its own, so the stick, gestures and ITEM all work together. A short guide shows the
+Phones and tablets get the touch controls automatically (coarse pointer or no hover): the item
+button on the left, the stick on the right, and gestures anywhere else on the screen. A plain tap
+never jumps; it moves the car to the lane under the finger (`Game.laneAtScreen()`). Resting a thumb
+on the stick does nothing; pushing it does. Every finger is tracked on its own, so the stick,
+gestures and the item button all work together. A short guide shows the
 controls at the start of each run. Tuning lives in `systems/input.ts` (`SWIPE_PX`, `HOLD_MS`,
 `STILL_PX`), `ui/hud.ts` (`FLICK_PX`, `KNOB_TRAVEL` for the stick) and `style.css` (`--stick`,
 `--tc-lift`). In dev, add `?touch` to the URL to force touch controls on a desktop. Portrait
@@ -72,7 +76,7 @@ src/
     combo.ts          streak multiplier
     powers.ts         Starman / Rocket / Ludicrous timers, shield, rocket meter, item slot
   world/
-    environment.ts    sky shader (clouds, stars, meteors), sun and lights, fog, sky reflections, zone ground, mountains, skyline
+    environment.ts    sky shader (clouds, stars, meteors and aurora), sun and lights, fog, sky reflections, zone ground, mountains, skyline
     road.ts           wet-capable asphalt, kerbs, studs, verges, guard rails, lamps, sign gantry, roadside props and landmarks
     props.ts          landmark props: billboards, windmills, water towers, cabins, neon blade signs (and their animation)
     scatter.ts        GPU-instanced ground cover per zone (cacti, shrubs, grass, flowers, salt crystals, tumbleweeds…)
@@ -81,7 +85,7 @@ src/
     bend.ts           the world bend (curves and hills ahead), patched into every material's vertex shader
     zoneField.ts      texture of zone weights along the road, so shaders cross-fade zones where the palette does
     glsl.ts           shared noise functions for the world shaders
-    zones.ts          zone list (Sunset Highway → Salt Flats → Pine Ridge → Neon City) with palettes and props
+    zones.ts          zone list (Sunset Highway → Salt Flats → Pine Ridge → Neon City → Aurora Coast) with palettes and props
   fx/
     post.ts           render pipeline: MSAA HDR, bloom, sun shafts, heat haze, aberration, grade, zone sweep
     weather.ts        rain in the city, dust and pollen motes elsewhere
@@ -90,7 +94,7 @@ src/
   audio/sfx.ts        every sound effect, synthesized with Web Audio (no audio files)
   audio/music.ts      the soundtrack: a synthwave loop sequenced live (pad, bass, drums, arpeggio)
   ui/
-    hud.ts            score, air bar, combo meter, popups, item slot, power banner, game-over panel
+    hud.ts            HUD (score, air bar, combo meter, popups, item slot, power banner) and menus
     onlinePanels.ts   pilot-name dialog (first-visit welcome prompt and edit)
   online/             leaderboard backends (device-only / Supabase), callsigns, share links
   util/               math helpers and the seeded random generator
@@ -159,6 +163,33 @@ Each car is a design file in `src/entities/cars/`, turned into a 3D model by the
 | Change animations (lean in turns, nose pitch, flip/roll spin) | `player.ts` → `updatePose()` |
 | Change the crash tumble | `player.ts` → `crash()` (spin speeds) and `updateCrash()` (bounce) |
 | Change the shield bubble | `player.ts`: `SHIELD_FRAGMENT` (hex cells, rim, energy pulses), `updateShield()` (pop-up and burst), `SHIELD_DEPLOY` / `SHIELD_BURST` |
+
+### Menus
+
+Home, pause and game over share one layout: a solid sheet on the left (along the bottom on
+portrait phones) with a list menu, and button prompts in the bottom-right corner that switch to
+controller buttons while a pad is in use. Type is Barlow Condensed for headings and figures and
+Barlow for text (the road signs use it too).
+
+| I want to… | Go to |
+| --- | --- |
+| Change the colours, sheet width or type | `style.css` → `:root` (`--accent`, `--surface*`, `--sheet-w`, `--font-*`) |
+| Change the list menus | the `.menu-list` blocks in `index.html`; `.menu-item` in `style.css`; `Hud.navigate()` / `activate()` |
+| Change the button prompts | `ui/hud.ts` → `PROMPTS` |
+| Change the how-to-play card | `#howto` in `index.html` |
+
+### Paint shop, photo mode and vibration
+
+| I want to… | Go to |
+| --- | --- |
+| Add or price paints and wheel finishes | `entities/finishes.ts` → `PAINTS`, `WHEELS` (`km` is the lifetime distance that unlocks each) |
+| Change how a finish is applied | `carModel.ts` → `setFinish()` (metallic flake is on for paints with metalness 0.2–0.9) |
+| Change photo mode limits or the caption | `game.ts` → `PHOTO_DIST`, `PHOTO_PITCH`, `stampPhoto()` |
+| Change rumble and phone buzz strengths | `systems/haptics.ts` → `RUMBLE`, `PHONE` |
+| Remap controller buttons | `systems/input.ts` → `PAD_BUTTONS` |
+
+The paint shop opens inside the home sheet: ↑ ↓ pick the body or wheels row, ← → try each
+finish on the car. Lifetime distance (for paint shop unlocks) is kept with the best scores.
 
 **Using your own 3D model (.glb).** Load it inside `buildRoadster()` with Three.js's
 `GLTFLoader` (`three/examples/jsm/loaders/GLTFLoader.js`) and add it to `root`. The model should
@@ -291,7 +322,7 @@ While `npm run dev` is running, the game is available in the browser console as 
 __game.info()                  // speed, distance, air, power, zone…
 __game.onPickup('star')        // instant Starman (also 'shockwave', 'ludicrous', 'shield', 'airCan')
 __game.powers.start('rocket')  // force a power mode
-__game.distance = 7600         // jump ahead to Neon City (Pine Ridge starts at 5000)
+__game.distance = 10800        // jump ahead to Aurora Coast (Neon City starts at 7500)
 __game.player.air = 600        // refill air
 ```
 

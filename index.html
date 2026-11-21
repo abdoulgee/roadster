@@ -5,10 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="description" content="Drive Roadster — jump, flip, hover and boost through endless highway traffic." />
     <title>Drive Roadster</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23141018'/%3E%3Cpath d='M5 21l4-6h11l5 3 2 3v3H5z' fill='%23ff4d5e'/%3E%3Ccircle cx='10' cy='24' r='3' fill='%23eee'/%3E%3Ccircle cx='23' cy='24' r='3' fill='%23eee'/%3E%3C/svg%3E"
+    />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@500;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;1,700;1,800&family=Barlow:wght@500;600;700&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/src/style.css" />
@@ -19,7 +23,7 @@
     <!-- Covers the canvas only until the game is ready (see main.ts). -->
     <div id="loading" class="loading">
       <div class="loading-inner">
-        <h1><span>DRIVE</span><span>ROADSTER</span></h1>
+        <h1 class="wordmark-type"><span>Drive</span><span>Roadster</span></h1>
         <div class="loading-bar"><div id="loading-fill"></div></div>
       </div>
     </div>
@@ -39,7 +43,7 @@
       </div>
       <div id="zone-banner" class="zone-banner"></div>
       <button id="btn-pause" class="icon-btn" tabindex="-1" aria-label="Pause">
-        <span>II</span><kbd>P</kbd>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14" /></svg>
       </button>
       <div id="popups" aria-live="polite"></div>
       <div id="hud-air" class="hud-air">
@@ -56,30 +60,25 @@
         <div id="hud-shield" class="hud-shield hidden">HEAT SHIELD</div>
       </div>
       <div class="touch-controls">
-        <!-- The game view takes one-thumb gestures (see Input.attachGestures); these only give feedback. -->
+        <!-- Touches and directional swipes steer one lane at a time; controls stay on the left. -->
         <div class="tc-edge left" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" /></svg></div>
         <div class="tc-edge right" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" /></svg></div>
+        <div class="tc-edge up" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 15l7-7 7 7" /></svg></div>
+        <div class="tc-edge down" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 9l7 7 7-7" /></svg></div>
         <div class="tc-guide" aria-hidden="true">
-          <span><b>← →</b>Swipe · lane</span>
-          <span><b>HOLD</b>Boost</span>
-          <span><b>STICK</b>Jump · hold to fly</span>
-          <span><b>↓</b>Swipe · slam</span>
+          <span><b>TAP / SWIPE</b>← → Lane</span>
+          <span><b>↑ HOLD</b>Jump · hover</span>
+          <span><b>BOOST</b>Hold button or hold screen</span>
+          <span><b>↓</b>Swipe to slam</span>
         </div>
         <div class="tc-left">
           <button class="touch-btn small item" data-touch="item" tabindex="-1" aria-label="Use item">
             <svg viewBox="0 0 24 24"><path d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.4 6.7 19.4l1.2-6L3.4 9.3l6-.7z" /></svg>
             <img class="tc-item-icon" alt="" />
-            <span>ITEM</span>
           </button>
-        </div>
-        <!-- JUMP stick: touch to jump, keep holding to fly, push left/right for lanes, flick down to slam. -->
-        <div class="tc-right">
-          <button class="stick" data-touch="jump" tabindex="-1" aria-label="Jump stick: hold to fly, push sideways to change lane, flick down to slam">
-            <i class="stick-mark l"></i><i class="stick-mark r"></i><i class="stick-mark d"></i>
-            <span class="stick-knob">
-              <svg viewBox="0 0 24 24"><path d="M5 15l7-7 7 7" /></svg>
-              <span>JUMP</span>
-            </span>
+          <button class="touch-btn small boost" data-touch="boost" tabindex="-1" aria-label="Hold to boost">
+            <svg viewBox="0 0 24 24"><path d="M13 2L5 13h6l-1 9 9-12h-6l1-8z" /></svg>
+            <span>BOOST</span>
           </button>
         </div>
       </div>
@@ -99,48 +98,67 @@
         <path class="wave" d="M16 9a4 4 0 010 6M18.5 6.5a7.5 7.5 0 010 11" />
         <path class="cross" d="M16 9l5 6M21 9l-5 6" />
       </svg>
-      <span id="mute-label">SOUND ON</span><kbd>M</kbd>
+      <span id="mute-label" class="sr-only">Sound on</span>
     </button>
 
+    <!-- Home, pause and game over share one layout: a solid sheet on the left (along the bottom on
+         portrait phones) holding a list menu that the arrows, a controller or a tap can drive. -->
     <section id="menu" class="screen">
-      <div class="menu-panel">
-        <p class="eyebrow">Endless highway stunt runner</p>
-        <h1><span>DRIVE</span><span>ROADSTER</span></h1>
-        <div class="pilot">
-          <span id="pilot-badge" class="pilot-badge" aria-hidden="true">P</span>
-          <div class="pilot-text">
-            <label>Pilot</label>
-            <b id="menu-pilot">Connecting pilot…</b>
-          </div>
-          <button id="btn-callsign" class="pilot-edit" tabindex="-1" aria-label="Change pilot name">
-            <svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16zM14 6l4 4" /></svg>
-          </button>
+      <div class="sheet">
+        <div class="menu-home">
+          <header class="wordmark">
+            <h1><span>Drive</span><span>Roadster</span></h1>
+            <p class="tagline">Endless highway stunt runner</p>
+          </header>
+          <p id="menu-challenge" class="challenge hidden"></p>
+          <nav class="menu-list" aria-label="Main menu">
+            <button id="btn-play" class="menu-item primary" tabindex="-1"><span>Play</span><svg class="chev" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" /></svg></button>
+            <button id="btn-paint" class="menu-item" tabindex="-1"><span>Paint shop</span><small id="menu-unlocked" class="meta"></small><svg class="chev" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" /></svg></button>
+            <button id="btn-howto" class="menu-item" tabindex="-1"><span>How to play</span><svg class="chev" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" /></svg></button>
+          </nav>
+          <footer class="profile">
+            <div class="pilot">
+              <span id="pilot-badge" class="pilot-badge" aria-hidden="true">P</span>
+              <div class="pilot-text">
+                <b id="menu-pilot">Connecting…</b>
+                <small>Pilot</small>
+              </div>
+              <button id="btn-callsign" class="pilot-edit" tabindex="-1" aria-label="Change pilot name">
+                <svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16zM14 6l4 4" /></svg>
+              </button>
+            </div>
+            <dl class="figures">
+              <div><dt>Best score</dt><dd id="menu-best">—</dd></div>
+              <div><dt>Furthest</dt><dd id="menu-dist">—</dd></div>
+              <div><dt>Driven</dt><dd id="menu-driven">—</dd></div>
+            </dl>
+          </footer>
         </div>
-        <p id="menu-challenge" class="challenge hidden"></p>
-        <div class="stats">
-          <div><label>Best score</label><b id="menu-best">—</b></div>
-          <div><label>Best distance</label><b id="menu-dist">—</b></div>
+
+        <!-- Paint shop: colours and wheel finishes for the car on show, unlocked by lifetime distance. -->
+        <div id="paintshop" class="menu-shop hidden" role="dialog" aria-label="Paint shop">
+          <header class="sheet-head">
+            <button id="btn-paint-close" class="back-btn" tabindex="-1" aria-label="Back">
+              <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" /></svg>
+            </button>
+            <div>
+              <h2>Paint shop</h2>
+              <small id="paint-car">Roadster</small>
+            </div>
+            <span id="paint-total" class="paint-total">0 km</span>
+          </header>
+          <section class="shop-row" data-row="0">
+            <div class="shop-label"><span>Body</span><b id="paint-name"></b></div>
+            <div id="paint-swatches" class="swatches"></div>
+          </section>
+          <section class="shop-row" data-row="1">
+            <div class="shop-label"><span>Wheels</span><b id="wheel-name"></b></div>
+            <div id="wheel-swatches" class="swatches"></div>
+          </section>
+          <p id="paint-status" class="paint-status"></p>
         </div>
-        <div class="menu-buttons">
-          <button id="btn-play" class="btn primary play" tabindex="-1">
-            <svg viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z" /></svg>PLAY <kbd>SPACE</kbd>
-          </button>
-        </div>
-        <table class="controls">
-          <tr><td><kbd>←</kbd> <kbd>→</kbd></td><td>Change lane · barrel roll in the air</td></tr>
-          <tr><td><kbd>↑</kbd> / <kbd>Space</kbd></td><td>Jump · hold to fly · press again to flip</td></tr>
-          <tr><td><kbd>↓</kbd></td><td>Slam down</td></tr>
-          <tr><td><kbd>Shift</kbd></td><td>Boost</td></tr>
-          <tr><td><kbd>Z</kbd></td><td>Use item</td></tr>
-          <tr><td><kbd>P</kbd> · <kbd>M</kbd></td><td>Pause · sound</td></tr>
-        </table>
-        <p class="note">
-          Flying, flips and boost use AIR. It refills on the ground and from tricks. Chain flips, rolls,
-          clears and near misses into a streak to raise your multiplier. Grab air orbs to charge ROCKET
-          mode, and the golden star for STARMAN.
-        </p>
-        <p class="note touch-note">JUMP stick (right): touch to jump, keep holding to fly, push it left or right to change lane (also while flying), flick it down to slam. Anywhere on the screen: swipe left or right to change lane, hold to boost and slide to change lane while boosting, swipe down to slam. ITEM is on the left.</p>
       </div>
+
       <!-- Garage: the arrows flank the orbiting car; the game positions this layer every frame. -->
       <div id="garage" class="garage" aria-label="Choose your car">
         <button id="btn-car-prev" class="garage-arrow prev" tabindex="-1" aria-label="Previous car">
@@ -152,47 +170,126 @@
         <div class="garage-info">
           <b id="car-name">Roadster</b>
           <small id="car-tagline"></small>
+          <span id="car-pips" class="car-pips" aria-hidden="true"></span>
         </div>
       </div>
     </section>
 
-    <section id="pause" class="screen center hidden">
-      <div class="panel">
-        <h2>PAUSED</h2>
-        <button id="btn-resume" class="btn primary" tabindex="-1">Resume <kbd>P</kbd></button>
-        <button id="btn-pause-menu" class="btn" tabindex="-1">Main menu</button>
+    <section id="pause" class="screen dim hidden">
+      <div class="sheet">
+        <header class="sheet-title">
+          <h2>Paused</h2>
+          <p id="pause-run" class="run-line"></p>
+        </header>
+        <nav class="menu-list" aria-label="Pause menu">
+          <button id="btn-resume" class="menu-item primary" tabindex="-1"><span>Resume</span><svg class="chev" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" /></svg></button>
+          <button id="btn-photo" class="menu-item" tabindex="-1"><span>Photo mode</span><svg class="chev" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" /></svg></button>
+          <button id="btn-pause-howto" class="menu-item" tabindex="-1"><span>How to play</span><svg class="chev" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" /></svg></button>
+          <button id="btn-sound" class="menu-item toggle" tabindex="-1" aria-pressed="true"><span>Sound</span><small id="sound-state" class="meta">On</small></button>
+          <button id="btn-haptics" class="menu-item toggle" tabindex="-1" aria-pressed="true"><span>Vibration</span><small id="haptics-state" class="meta">On</small></button>
+          <button id="btn-pause-menu" class="menu-item" tabindex="-1"><span>Quit to menu</span><svg class="chev" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" /></svg></button>
+        </nav>
       </div>
     </section>
 
-    <section id="over" class="screen center hidden">
-      <div class="panel">
-        <p id="over-reason" class="reason">COLLISION</p>
-        <p id="over-record" class="record hidden">NEW RECORD</p>
-        <div id="over-score" class="big-score">0</div>
-        <p id="over-rank" class="rank-line"></p>
+    <section id="over" class="screen hidden">
+      <div class="sheet">
+        <header class="result">
+          <p id="over-reason" class="reason">Collision</p>
+          <div id="over-score" class="big-score">0</div>
+          <p class="score-label">Points <span id="over-record" class="record hidden">New best</span></p>
+        </header>
+        <dl class="figures">
+          <div><dt>Distance</dt><dd id="over-dist">0 m</dd></div>
+          <div><dt>Time</dt><dd id="over-time">0:00</dd></div>
+          <div><dt>Best</dt><dd id="over-best">0</dd></div>
+        </dl>
         <p id="over-challenge" class="challenge hidden"></p>
-        <div class="run-stats">
-          <div><label>Distance</label><b id="over-dist">0 m</b></div>
-          <div><label>Time</label><b id="over-time">0:00</b></div>
-          <div><label>Best</label><b id="over-best">0</b></div>
-        </div>
-        <button id="btn-retry" class="btn primary" tabindex="-1">Retry <kbd>SPACE</kbd></button>
-        <button id="btn-share" class="btn" tabindex="-1">Share</button>
-        <button id="btn-over-menu" class="btn" tabindex="-1">Menu</button>
+        <p id="over-rank" class="status-line"></p>
+        <nav class="menu-list" aria-label="Game over menu">
+          <button id="btn-retry" class="menu-item primary" tabindex="-1"><span>Retry</span><svg class="chev" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" /></svg></button>
+          <button id="btn-share" class="menu-item" tabindex="-1"><span>Share run</span><svg class="chev" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" /></svg></button>
+          <button id="btn-over-photo" class="menu-item" tabindex="-1"><span>Photo mode</span><svg class="chev" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" /></svg></button>
+          <button id="btn-over-menu" class="menu-item" tabindex="-1"><span>Main menu</span><svg class="chev" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" /></svg></button>
+        </nav>
       </div>
     </section>
+
+    <!-- How to play: controls for the device in use, and the scoring basics. -->
+    <section id="howto" class="screen center modal hidden">
+      <div class="card howto" role="dialog" aria-labelledby="howto-title">
+        <header class="card-head">
+          <h2 id="howto-title">How to play</h2>
+          <button id="btn-howto-close" class="close-btn" tabindex="-1" aria-label="Close">
+            <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" /></svg>
+          </button>
+        </header>
+        <table class="keys">
+          <thead><tr><th></th><th>Keyboard</th><th>Controller</th></tr></thead>
+          <tbody>
+            <tr><td>Change lane · barrel roll in the air</td><td><kbd>←</kbd> <kbd>→</kbd></td><td><kbd class="pad-glyph">L</kbd> stick · d-pad</td></tr>
+            <tr><td>Jump · hold to fly · again to flip</td><td><kbd>↑</kbd> <kbd>Space</kbd></td><td><kbd class="pad-glyph a">A</kbd></td></tr>
+            <tr><td>Slam down</td><td><kbd>↓</kbd></td><td><kbd class="pad-glyph b">B</kbd></td></tr>
+            <tr><td>Boost</td><td><kbd>Shift</kbd></td><td><kbd>RT</kbd></td></tr>
+            <tr><td>Use item</td><td><kbd>Z</kbd></td><td><kbd class="pad-glyph x">X</kbd></td></tr>
+            <tr><td>Pause</td><td><kbd>P</kbd> <kbd>Esc</kbd></td><td><kbd>Start</kbd></td></tr>
+            <tr><td>Photo mode, when paused</td><td><kbd>C</kbd></td><td><kbd class="pad-glyph y">Y</kbd></td></tr>
+            <tr><td>Sound on / off</td><td><kbd>M</kbd></td><td><kbd>View</kbd></td></tr>
+          </tbody>
+        </table>
+        <ul class="gestures">
+          <li><b>Tap</b> the left or right half to move one lane. Swipe left or right for repeated lane changes, including in the air.</li>
+          <li><b>Swipe up</b> to jump; keep holding to hover and release to fall. Swipe down to slam.</li>
+          <li><b>Boost</b> by holding the BOOST button or holding anywhere on the road; drag to steer while boosting.</li>
+          <li><b>Item</b> and BOOST buttons sit together on the left.</li>
+        </ul>
+        <ul class="rules">
+          <li><b>Air</b> powers flying, flips and boost. It refills on the ground and from tricks.</li>
+          <li><b>Streaks</b> of flips, rolls, clears and near misses raise your score multiplier.</li>
+          <li><b>Air orbs</b> charge Rocket mode. The golden star makes you a Starman.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- Photo mode: the world is frozen and the camera flies freely around the car. -->
+    <section id="photo" class="photo hidden">
+      <div class="photo-bar">
+        <p class="photo-help">
+          <b>Photo mode</b>
+          <span class="mouse-help">Drag to orbit · scroll to zoom · arrows to move</span>
+          <span class="touch-help">Drag to orbit · pinch to zoom</span>
+          <span class="pad-help">Sticks to orbit · triggers to zoom</span>
+        </p>
+        <div class="photo-buttons">
+          <button id="btn-photo-back" class="btn" tabindex="-1">Back</button>
+          <button id="btn-photo-save" class="btn primary" tabindex="-1">
+            <svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4zM12 17a4 4 0 100-8 4 4 0 000 8z" /></svg>Save photo
+          </button>
+        </div>
+      </div>
+      <div id="photo-flash" class="photo-flash"></div>
+    </section>
+
+    <!-- Button prompts for the screen on show (keyboard or controller glyphs; hidden on touch). -->
+    <div id="prompts" class="prompts" aria-hidden="true"></div>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
     <section id="callsign" class="screen center modal hidden">
-      <div class="panel">
-        <h2 id="callsign-title">PILOT NAME</h2>
-        <p id="callsign-text" class="note">2–12 characters: letters, numbers, _ - or .</p>
+      <div class="card">
+        <header class="card-head">
+          <h2 id="callsign-title">Pilot name</h2>
+        </header>
+        <p id="callsign-text" class="card-text">2–12 characters: letters, numbers, _ - or .</p>
         <div class="callsign-row">
           <input id="callsign-input" maxlength="12" autocomplete="off" spellcheck="false" placeholder="Your name" aria-label="Pilot name" />
           <button id="btn-callsign-random" class="btn" tabindex="-1">Random</button>
         </div>
         <p id="callsign-error" class="form-error" role="alert"></p>
-        <button id="btn-callsign-save" class="btn primary" tabindex="-1">Save</button>
-        <button id="btn-callsign-cancel" class="btn" tabindex="-1">Cancel</button>
+        <div class="card-buttons">
+          <button id="btn-callsign-cancel" class="btn" tabindex="-1">Cancel</button>
+          <button id="btn-callsign-save" class="btn primary" tabindex="-1">Save</button>
+        </div>
       </div>
     </section>
 

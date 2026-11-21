@@ -22,13 +22,13 @@ export const SPEED_CURVE: readonly (readonly [number, number])[] = [
 ];
 
 export const PHYS = {
-  gravity: 28,
-  jumpHeight: 2.5,
+  gravity: 25,
+  jumpHeight: 3.2,
   maxHeight: 6.2,
   holdDelay: 0.12, // hold jump this long before hovering kicks in
-  laneShiftTime: 0.15,
-  laneShiftTimeNoAir: 0.35,
-  airLaneShiftTime: 0.28,
+  laneShiftTime: 0.21,
+  laneShiftTimeNoAir: 0.3,
+  airLaneShiftTime: 0.24,
   trickTime: 0.55,
   flipTime: 0.5,
   flipMinLift: 2.5,

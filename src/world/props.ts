@@ -219,9 +219,9 @@ function boardTexture([title, line, bg, fg]: readonly [string, string, string, s
   ctx.restore();
   ctx.fillStyle = fg;
   ctx.textAlign = 'center';
-  ctx.font = '700 70px "Chakra Petch", system-ui, sans-serif';
+  ctx.font = '700 70px "Barlow Condensed", system-ui, sans-serif';
   ctx.fillText(title, 256, 112);
-  ctx.font = '600 30px "Chakra Petch", system-ui, sans-serif';
+  ctx.font = '600 30px "Barlow Condensed", system-ui, sans-serif';
   ctx.fillText(line, 256, 168);
   ctx.strokeStyle = fg;
   ctx.lineWidth = 8;
@@ -247,7 +247,7 @@ function neonWordTexture(word: string) {
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, 128, 512);
   ctx.textAlign = 'center';
-  ctx.font = '700 76px "Chakra Petch", system-ui, sans-serif';
+  ctx.font = '700 76px "Barlow Condensed", system-ui, sans-serif';
   const step = 470 / word.length;
   ctx.shadowColor = '#fff';
   ctx.shadowBlur = 12;

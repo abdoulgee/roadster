@@ -221,11 +221,13 @@ export class Effects {
 
       if (player.boosting) {
         // Cold-gas plume streaming back from the rear thrusters.
-        this.plumeAcc += dt * 20;
+        this.plumeAcc += dt * 34;
         while (this.plumeAcc >= 1) {
           this.plumeAcc--;
           const [nx, ny, nz] = player.thrusters.rear[Math.floor(Math.random() * 2)];
-          this.puffAt(player, nx, ny, nz + 0.3, 0, 0.1, 1, { size: 0.35, sizeEnd: 1.1, life: 0.8, speed: 7, spread: 0.8, alpha: 0.75 });
+          this.puffAt(player, nx, ny, nz + 0.3, 0, 0.1, 1, {
+            size: 0.32, sizeEnd: 1.35, life: 0.72, speed: 8, spread: 0.48, alpha: 0.68, drag: 2.1,
+          });
         }
         this.emberAcc += dt * 70;
         while (this.emberAcc >= 1) {

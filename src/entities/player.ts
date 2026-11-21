@@ -3,6 +3,8 @@ import { AIR, LANES, PHYS, START_LANE, laneX } from '../config';
 import { clamp, damp, easeInOut, lerp } from '../util/math';
 import type { CarId, CarModel } from './carModel';
 import { DEFAULT_CAR, getCar } from './cars';
+import { contactShadow } from '../fx/contactShadow';
+import type { PaintFinish, WheelFinish } from './finishes';
 
 export type TrickKind = 'flip' | 'roll';
 /**
@@ -91,6 +93,60 @@ const SHIELD_FRAGMENT = /* glsl */ `
   }
 `;
 
+/** Suspension: spring stiffness (1/s²) and damping (1/s) for the body bouncing on its wheels. */
+const SPRING_K = 190;
+const SPRING_C = 15;
+
+let beamTexture: THREE.Texture | null = null;
+
+/**
+ * Two headlamp throws on the road (v = 0 at the bumper, 1 at the far end): each fans out and fades
+ * with distance, and both ease in from the bumper so the pool has no hard edge.
+ */
+function headlightBeams() {
+  if (beamTexture) return beamTexture;
+  const w = 64;
+  const h = 128;
+  const data = new Uint8Array(w * h * 4);
+  for (let j = 0; j < h; j++) {
+    const v = j / (h - 1);
+    const reach = Math.min(1, v / 0.1) ** 2 * (1 - v) ** 1.6;
+    const half = 0.07 + 0.2 * v;
+    for (let i = 0; i < w; i++) {
+      const u = i / (w - 1);
+      let k = 0;
+      for (const side of [-1, 1]) {
+        const c = 0.5 + side * (0.17 + 0.1 * v);
+        k += Math.exp(-(((u - c) / half) ** 2) * 2.2);
+      }
+      const edge = Math.min(1, Math.min(u, 1 - u) / 0.08);
+      const val = Math.min(1, k * reach * edge) * 255;
+      data.set([val, val, val, 255], (j * w + i) * 4);
+    }
+  }
+  beamTexture = new THREE.DataTexture(data, w, h, THREE.RGBAFormat);
+  beamTexture.magFilter = beamTexture.minFilter = THREE.LinearFilter;
+  beamTexture.needsUpdate = true;
+  return beamTexture;
+}
+
+/** A pool of lamp light flat on the road, added on top of it. */
+const lampPool = (color: number) =>
+  new THREE.Mesh(
+    new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2).translate(0, 0, -0.5),
+    new THREE.MeshBasicMaterial({
+      color,
+      map: headlightBeams(),
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -4,
+      polygonOffsetUnits: -4,
+    }),
+  );
+
 /** Seconds the shield takes to pop up around the car, and to burst when it saves you. */
 const SHIELD_DEPLOY = 0.35;
 const SHIELD_BURST = 0.45;
@@ -126,6 +182,16 @@ export class Player {
   readonly sideJets = [0, 0];
 
   private readonly pivot = new THREE.Group();
+  private readonly shadow = contactShadow(4.4, 1.9, true);
+  private readonly beams = lampPool(0xfff1d8);
+  private readonly tailGlow = lampPool(0xff2030);
+  /** 0 by day, 1 at night or in a tunnel: how much the lamps light the road. */
+  private night = 0;
+  // Sprung body: heave (m) and pitch (rad) with their velocities.
+  private heave = 0;
+  private heaveV = 0;
+  private pitch = 0;
+  private pitchV = 0;
   private model: CarModel;
   private readonly shieldMesh: THREE.Mesh<THREE.SphereGeometry, THREE.ShaderMaterial>;
   private readonly shieldSize = new THREE.Vector3(1, 1, 1);
@@ -149,6 +215,10 @@ export class Player {
   constructor() {
     this.model = getCar(DEFAULT_CAR);
     this.object.add(this.pivot);
+    this.beams.renderOrder = this.tailGlow.renderOrder = -0.4;
+    this.beams.visible = this.tailGlow.visible = false;
+    this.tailGlow.rotation.y = Math.PI; // throws backwards
+    this.object.add(this.shadow, this.beams, this.tailGlow);
 
     this.shieldMesh = new THREE.Mesh(
       // Poles at the nose and tail, so the hex cells stay even over the roof and sides.
@@ -192,6 +262,13 @@ export class Player {
     this.pivot.add(this.model.root);
     this.shieldSize.set(spec.width * 0.79, spec.height * 0.88, spec.length * 0.66);
     this.shieldMesh.scale.copy(this.shieldSize);
+    // Beams start at the front bumper and throw about 24 m up the road; the tail glow sits behind.
+    this.beams.scale.set(spec.width * 2.4, 1, 24);
+    this.beams.position.z = -spec.length / 2 + 0.2;
+    this.tailGlow.scale.set(spec.width * 1.6, 1, 2.2);
+    this.tailGlow.position.z = spec.length / 2 - 0.1;
+    this.model.setSuspension(0, 0, 0);
+    this.updateGroundFx(0);
     this.model.setPaintGlow(0x000000, 0);
     this.model.setJets(this.jetLength, 0, 0);
     this.model.setSideJets(0, 0);
@@ -243,6 +320,16 @@ export class Player {
     this.model.setSmokeLight(tint, sunColor, sunDir);
   }
 
+  /** Paint shop finish for the current car; null restores its factory look. */
+  setFinish(paint: PaintFinish | null, wheels: WheelFinish | null) {
+    this.model.setFinish(paint, wheels);
+  }
+
+  /** How dark it is (0 day … 1 night or tunnel), for the lamps thrown on the road. */
+  setNight(k: number) {
+    this.night = k;
+  }
+
   /** Paint glow for power modes; intensity 0 turns it off. */
   setGlow(color: THREE.ColorRepresentation, intensity: number) {
     this.model.setPaintGlow(color, intensity);
@@ -268,6 +355,8 @@ export class Player {
     this.tricksThisAir = 0;
     this.events.length = 0;
     this.pivot.rotation.set(0, 0, 0);
+    this.heave = this.heaveV = this.pitch = this.pitchV = 0;
+    this.model.setSuspension(0, 0, 0);
     this.jetPower = this.sideJets[0] = this.sideJets[1] = 0;
     this.jetLength.fill(0);
     this.jetHits.fill(false);
@@ -362,6 +451,7 @@ export class Player {
 
     if (this.crashed) {
       this.updateCrash(dt);
+      this.updateGroundFx(0);
       this.updateShield(dt);
       return;
     }
@@ -432,7 +522,9 @@ export class Player {
     }
 
     this.updatePose();
+    this.updateSuspension(dt, speed);
     this.syncObject();
+    this.updateGroundFx(ground);
     // An empty tank fires nothing: no jets, just a sputter on the press.
     const fuelled = this.air > 0;
     this.jetPower =
@@ -484,6 +576,9 @@ export class Player {
 
   private land() {
     this.events.push({ type: 'land', impact: -this.vy });
+    // The body slams down on its springs and rebounds, rocking a little fore and aft.
+    this.heaveV -= clamp(-this.vy * 0.045, 0, 1.4);
+    this.pitchV += clamp(-this.vy * 0.01, 0, 0.35) * (Math.random() < 0.5 ? -1 : 1);
     this.grounded = true;
     this.vy = 0;
     if (this.trick) {
@@ -525,6 +620,46 @@ export class Player {
     this.pivot.rotation.y += this.spin.y * dt;
     this.pivot.rotation.z += this.spin.z * dt;
     this.syncObject();
+  }
+
+  /**
+   * The body rides on springs over the wheels: it squats under boost, droops the wheels in the air,
+   * compresses on landing, leans into lane changes and shivers faintly over the road at speed.
+   */
+  private updateSuspension(dt: number, speed: number) {
+    const fast = clamp((speed - 20) / 80, 0, 1);
+    const heaveTarget = this.grounded ? -0.006 * fast : 0.035;
+    const pitchTarget = this.grounded && (this.boosting || this.rocket) ? 0.022 : 0;
+    // Semi-implicit Euler on a damped spring; dt is capped at 1/20 s, well inside its stable range.
+    this.heaveV += ((heaveTarget - this.heave) * SPRING_K - this.heaveV * SPRING_C) * dt;
+    this.pitchV += ((pitchTarget - this.pitch) * SPRING_K - this.pitchV * SPRING_C) * dt;
+    this.heave = clamp(this.heave + this.heaveV * dt, -0.09, 0.06);
+    this.pitch = clamp(this.pitch + this.pitchV * dt, -0.05, 0.05);
+    const t = this.time;
+    const buzz = this.grounded ? fast * (Math.sin(t * 37) * 0.6 + Math.sin(t * 61 + 1.3) * 0.4) : 0;
+    const roll = this.grounded && this.laneT < 1 ? -this.laneDir * Math.sin(Math.PI * this.laneT) * 0.025 : 0;
+    this.model.setSuspension(this.heave + buzz * 0.0025, this.pitch + buzz * 0.0012, roll);
+  }
+
+  /** Contact shadow on whatever is below, and the lamps' pools of light on the road at night. */
+  private updateGroundFx(ground: number) {
+    const above = Math.max(0, this.y - ground);
+    const shadow = this.shadow;
+    shadow.position.y = ground - this.y + 0.012;
+    // Spreads and fades as the car climbs; gone by about 7 m up.
+    const spread = 1 + above * 0.12;
+    const spec = this.model.spec;
+    shadow.scale.set(spec.width * 1.12 * spread, 1, spec.length * 1.08 * spread);
+    (shadow.material as THREE.MeshBasicMaterial).opacity = 0.9 * Math.exp(-above * 0.5);
+    shadow.visible = above < 7;
+
+    const lamps = this.crashed ? 0 : this.night * Math.exp(-above * 0.35);
+    for (const m of [this.beams, this.tailGlow]) {
+      m.visible = lamps > 0.01;
+      m.position.y = ground - this.y + 0.02;
+    }
+    this.beams.material.opacity = lamps * 0.5;
+    this.tailGlow.material.opacity = lamps * 0.14;
   }
 
   private syncObject() {

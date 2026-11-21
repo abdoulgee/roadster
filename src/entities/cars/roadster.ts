@@ -141,17 +141,40 @@ export const ROADSTER: CarDesign = {
       .translate(0.012, 0, 0);
     for (const x of [-0.42, 0.42]) add(neckGeo, 'trim', 'wing-mount').position.x = x;
 
-    // Exposed diffuser: a black block under the tail with four cold-gas nozzles in a row.
-    const diffuser = add(new THREE.BoxGeometry(1.2, 0.2, 0.36), 'trim', 'diffuser');
-    diffuser.position.set(0, 0.25, TAIL - 0.2);
-    const ring = new THREE.TorusGeometry(0.052, 0.012, 10, 28);
-    const throat = new THREE.CylinderGeometry(0.05, 0.04, 0.05, 24).rotateX(Math.PI / 2);
+    // Exposed diffuser: the floor sweeps up toward the tail between vertical fins, with four cold-gas
+    // nozzles in its rear face. Profiles are drawn in (z, y) and extruded across the car.
+    const zFront = TAIL - 0.46;
+    const zBack = TAIL - 0.012;
+    const across = (shape: THREE.Shape, width: number) =>
+      new THREE.ExtrudeGeometry(shape, { depth: width, bevelEnabled: false, curveSegments: 8 })
+        .rotateY(-Math.PI / 2)
+        .translate(width / 2, 0, 0);
+    const ramp = new THREE.Shape();
+    ramp.moveTo(zFront, 0.13);
+    ramp.quadraticCurveTo(TAIL - 0.2, 0.14, zBack, 0.19);
+    ramp.lineTo(zBack, 0.36);
+    ramp.lineTo(zFront, 0.34);
+    ramp.closePath();
+    add(across(ramp, 1.24), 'trim', 'diffuser').castShadow = true;
+    // Fins: flat along the floor line, their top edge following the ramp.
+    const fin = new THREE.Shape();
+    fin.moveTo(zFront + 0.04, 0.13);
+    fin.quadraticCurveTo(TAIL - 0.2, 0.14, zBack + 0.004, 0.19);
+    fin.lineTo(zBack + 0.004, 0.11);
+    fin.quadraticCurveTo(TAIL - 0.12, 0.105, zFront + 0.08, 0.125);
+    fin.closePath();
+    const finGeo = across(fin, 0.014);
+    for (const x of [-0.6, -0.26, 0, 0.26, 0.6]) add(finGeo, 'trim', 'strake').position.x = x;
+    // Nozzles: a polished lip, a dark bell and a throat that glows hot under boost.
+    const ring = new THREE.TorusGeometry(0.055, 0.011, 10, 32);
+    // Mirrored so its inside faces outward: it is only ever seen from within, looking into the bell.
+    const bell = new THREE.CylinderGeometry(0.052, 0.034, 0.07, 28, 1, true).rotateX(Math.PI / 2).scale(-1, 1, 1);
+    bell.computeVertexNormals();
+    const throat = new THREE.CircleGeometry(0.034, 24);
     for (const x of [-0.39, -0.13, 0.13, 0.39]) {
-      add(ring, 'chrome', 'nozzle').position.set(x, 0.25, TAIL - 0.015);
-      add(throat, 'under', 'nozzle-throat').position.set(x, 0.25, TAIL - 0.03);
-    }
-    for (const x of [-0.56, -0.26, 0, 0.26, 0.56]) {
-      add(new THREE.BoxGeometry(0.012, 0.12, 0.34), 'trim', 'strake').position.set(x, 0.12, TAIL - 0.2);
+      add(ring, 'chrome', 'nozzle').position.set(x, 0.275, zBack + 0.004);
+      add(bell, 'under', 'nozzle-bell').position.set(x, 0.275, zBack - 0.03);
+      add(throat, 'glow', 'nozzle-throat').position.set(x, 0.275, zBack - 0.06);
     }
   },
 };

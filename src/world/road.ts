@@ -349,6 +349,7 @@ const SIGNS: readonly (readonly [string, string])[][] = [
   [['EXIT 41', 'Salt Basin'], ['NORTH', 'RN.ZAINAB  32']],
   [['EXIT 53', 'Pine Ridge'], ['NORTH', 'Summit Pass  12']],
   [['EXIT 66', 'Downtown'], ['EAST', 'Neon District  4']],
+  [['EXIT 78', 'Aurora Coast'], ['NORTH', 'Icefjord  26']],
 ];
 
 function signTexture(pair: readonly [string, string]) {
@@ -372,9 +373,9 @@ function drawSign(canvas: HTMLCanvasElement, [top, bottom]: readonly [string, st
   ctx.stroke();
   ctx.fillStyle = '#f2f2ea';
   ctx.textAlign = 'center';
-  ctx.font = '700 44px "Chakra Petch", system-ui, sans-serif';
+  ctx.font = '700 44px "Barlow Condensed", system-ui, sans-serif';
   ctx.fillText(top, 256, 78);
-  ctx.font = '600 52px "Chakra Petch", system-ui, sans-serif';
+  ctx.font = '600 52px "Barlow Condensed", system-ui, sans-serif';
   ctx.fillText(bottom, 256, 152);
   ctx.beginPath();
   ctx.moveTo(256, 196);
@@ -552,6 +553,7 @@ const LANDMARKS: readonly (readonly [LandmarkKind | 'none', number])[][] = [
   [['windmill', 2], ['waterTower', 2], ['billboard', 2], ['none', 4]],
   [['cabin', 3], ['none', 6]],
   [['neon', 6], ['none', 2]],
+  [['billboard', 2], ['windmill', 1], ['none', 5]],
 ];
 
 interface LandmarkSlot {

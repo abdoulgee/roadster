@@ -9,14 +9,15 @@
   --gold: #ffc640;
   --rocket: #ff9a3d;
   /* Solid surfaces for the menus (no glass): darkest to lightest, and their dividing line. */
-  --surface: #111116;
-  --surface-2: #1a1a21;
-  --surface-3: #25252e;
-  --line: #30303b;
-  /* Cut corners: the menus' panels and buttons have two corners clipped off at 45°. */
-  --cut: 12px;
-  --font-ui: 'Chakra Petch', system-ui, sans-serif;
-  --font-num: 'JetBrains Mono', ui-monospace, monospace;
+  --surface: #0d0d12;
+  --surface-2: #16161d;
+  --surface-3: #212129;
+  --line: #2b2b35;
+  /* Barlow is drawn from California highway signs: the condensed cut for headings and figures,
+     the regular cut for running text. */
+  --font-ui: 'Barlow', system-ui, sans-serif;
+  --font-display: 'Barlow Condensed', 'Arial Narrow', system-ui, sans-serif;
+  --font-num: 'Barlow Condensed', 'Arial Narrow', system-ui, sans-serif;
 }
 
 * {
@@ -76,11 +77,19 @@ kbd {
   text-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
 }
 
-#hud.dimmed .hints,
-#hud.dimmed .mute-btn {
-  position: fixed;
-  right: 20px;
-  z-index: 5;
+#hud.admin-mode::before {
+  position: absolute;
+  right: max(14px, env(safe-area-inset-right));
+  bottom: calc(max(12px, env(safe-area-inset-bottom)) + 58px);
+  padding: 7px 12px;
+  border: 1px solid rgba(143, 227, 255, 0.42);
+  border-radius: 3px;
+  background: rgba(7, 20, 28, 0.82);
+  box-shadow: 0 0 18px rgba(71, 193, 255, 0.2);
+  color: var(--air);
+  font: 700 10px var(--font-ui);
+  letter-spacing: 0.14em;
+  white-space: nowrap;
 }
 
 .mute-btn.muted {
@@ -88,7 +97,6 @@ kbd {
 }
 
 .mute-icon {
-  display: none;
   width: 18px;
   height: 18px;
   fill: none;
@@ -194,18 +202,34 @@ kbd {
 .icon-btn {
   position: absolute;
   top: 18px;
-  right: 150px;
+  right: 70px;
   pointer-events: auto;
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  padding: 6px 10px;
-  border: 1px solid var(--line);
-  border-radius: 0;
-  background: var(--surface);
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  background: rgba(13, 13, 18, 0.72);
   color: var(--ink);
-  font: 700 14px var(--font-ui);
   cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.icon-btn:hover {
+  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(13, 13, 18, 0.9);
+}
+
+.icon-btn svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .mute-btn {
@@ -412,234 +436,6 @@ kbd {
   transition: opacity 0.2s;
 }
 
-/* ---------- Screens ---------- */
-
-.screen {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  align-items: center;
-}
-
-.screen.center {
-  justify-content: center;
-  background: rgba(6, 6, 10, 0.55);
-}
-
-/* Home: a solid sidebar down the left with a red edge; the garage car fills the rest of the screen. */
-#menu {
-  align-items: stretch;
-}
-
-.menu-panel {
-  display: flex;
-  flex-direction: column;
-  width: min(470px, 44vw);
-  padding: clamp(24px, 6vh, 60px) clamp(24px, 3.4vw, 52px);
-  overflow-y: auto;
-  border-right: 3px solid var(--accent);
-  background: linear-gradient(180deg, var(--surface) 0%, #0b0b0f 100%);
-  box-shadow: 18px 0 60px rgba(0, 0, 0, 0.45);
-}
-
-/* Centred vertically when it fits, scrolling from the top when it doesn't (plain centring would cut the top off). */
-.menu-panel > :first-child {
-  margin-top: auto;
-}
-
-.menu-panel > :last-child {
-  margin-bottom: auto;
-}
-
-.menu-panel h1 {
-  font-size: clamp(40px, 4.8vw, 74px);
-}
-
-.eyebrow {
-  margin: 0 0 6px;
-  font-size: 13px;
-  letter-spacing: 0.3em;
-  text-transform: uppercase;
-  color: var(--accent);
-}
-
-h1 {
-  display: flex;
-  flex-direction: column;
-  margin: 0 0 22px;
-  font-size: clamp(48px, 8vw, 92px);
-  line-height: 0.92;
-  letter-spacing: 0.06em;
-}
-
-h1 span:last-child {
-  color: transparent;
-  -webkit-text-stroke: 2px var(--ink);
-}
-
-.run-stats {
-  display: flex;
-  gap: 28px;
-  margin-bottom: 22px;
-}
-
-/* Best score / distance as two solid tiles. */
-.stats {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-bottom: 20px;
-}
-
-.stats > div {
-  padding: 10px 14px 12px;
-  border-top: 2px solid var(--line);
-  background: var(--surface-2);
-}
-
-.stats label,
-.run-stats label {
-  display: block;
-  font-size: 11px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--ink-dim);
-}
-
-.stats b,
-.run-stats b {
-  font-family: var(--font-num);
-  font-size: 20px;
-}
-
-.btn {
-  display: inline-flex;
-  gap: 12px;
-  align-items: center;
-  justify-content: center;
-  padding: 12px 26px;
-  border: none;
-  background: var(--surface-3);
-  color: var(--ink);
-  font: 700 17px var(--font-ui);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  cursor: pointer;
-  clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut));
-  transition: transform 0.12s, background 0.12s, color 0.12s;
-}
-
-.btn:hover {
-  transform: translateY(-1px);
-  background: #30303b;
-}
-
-.btn:active {
-  transform: translateY(1px);
-}
-
-.btn.primary {
-  background: var(--accent);
-  color: #fff;
-}
-
-.btn.primary:hover {
-  background: #ff5466;
-}
-
-.btn.primary kbd {
-  color: #fff;
-  border-color: rgba(255, 255, 255, 0.45);
-  background: rgba(0, 0, 0, 0.18);
-}
-
-/* The big PLAY button on the home screen. */
-.btn.play {
-  width: 100%;
-  padding: 18px 26px;
-  font-size: 24px;
-  letter-spacing: 0.22em;
-}
-
-.btn.play svg {
-  width: 22px;
-  height: 22px;
-  fill: currentColor;
-}
-
-.controls {
-  margin-top: 24px;
-  border-collapse: collapse;
-  font-size: 14px;
-  color: var(--ink-dim);
-}
-
-.controls td {
-  padding: 4px 14px 4px 0;
-}
-
-.note {
-  max-width: 380px;
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--ink-dim);
-}
-
-/* Pause, game over and the name prompt: solid cards with a red top edge and cut corners. */
-.panel {
-  --cut: 18px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  min-width: min(380px, calc(100vw - 32px));
-  max-width: calc(100vw - 32px);
-  padding: 30px 32px 28px;
-  background: linear-gradient(180deg, var(--surface-2) 0%, var(--surface) 100%);
-  box-shadow: inset 0 3px 0 var(--accent);
-  clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut));
-}
-
-.panel h2 {
-  margin: 0 0 8px;
-  letter-spacing: 0.2em;
-}
-
-.panel .btn {
-  --cut: 10px;
-}
-
-.panel .btn {
-  width: 100%;
-}
-
-.reason {
-  margin: 0;
-  font-size: 13px;
-  letter-spacing: 0.25em;
-  color: var(--accent);
-}
-
-.record {
-  margin: 0;
-  padding: 3px 10px;
-  border-radius: 4px;
-  background: var(--gold);
-  color: #1c1400;
-  font-weight: 700;
-  letter-spacing: 0.2em;
-}
-
-.big-score {
-  font-family: var(--font-num);
-  font-size: 56px;
-  font-weight: 700;
-}
-
-.run-stats {
-  margin-bottom: 8px;
-}
-
 .rocket-head {
   display: flex;
   justify-content: space-between;
@@ -795,8 +591,7 @@ h1 span:last-child {
   }
 }
 
-.touch-controls,
-.touch-note {
+.touch-controls {
   display: none;
 }
 
@@ -809,51 +604,42 @@ h1 span:last-child {
   --safe-t: max(12px, env(safe-area-inset-top));
 }
 
-/* ITEM on the left, the JUMP stick on the right, both lifted off the bottom edge; the game view
-   between them takes swipes and holds (lanes, boost). */
+/* Item and boost sit together on the left, clear of the swipe area and lifted above the bottom edge. */
 .touch .touch-controls {
   position: absolute;
   left: var(--safe-l);
   right: var(--safe-r);
   bottom: calc(var(--safe-b) + var(--tc-lift));
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: flex-end;
 }
 
-/* ITEM sits level with the middle of the stick. */
 .tc-left {
-  margin-bottom: calc((var(--stick) - var(--btn-small)) / 2);
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
-.touch .touch-note {
-  display: block;
-}
-
-.touch .hints,
-.touch .controls,
-.touch .menu-panel > .note:not(.touch-note),
-.touch kbd {
+.touch .hints {
   display: none;
 }
 
 .touch {
   --btn-small: clamp(56px, 16vw, 70px);
   --btn-main: clamp(88px, 27vw, 112px);
-  --stick: clamp(116px, 34vw, 148px);
-  --tc-lift: clamp(28px, 9vh, 96px);
+  --tc-lift: clamp(56px, 12vh, 132px);
 }
 
 @media (orientation: landscape) {
   .touch {
     --btn-small: clamp(50px, 14vh, 64px);
     --btn-main: clamp(80px, 25vh, 104px);
-    --stick: clamp(108px, 32vh, 140px);
-    --tc-lift: clamp(14px, 6vh, 48px);
+    --tc-lift: clamp(28px, 12vh, 72px);
   }
 }
 
-/* Lane feedback: a glow up the edge of the screen on the side a swipe moved to. */
+/* Direction feedback: side glows for steering and centered arrows for jump / slam. */
 .tc-edge {
   position: fixed;
   top: 0;
@@ -879,6 +665,33 @@ h1 span:last-child {
   background: linear-gradient(270deg, rgba(143, 227, 255, 0.22), transparent 60%);
 }
 
+.tc-edge.up,
+.tc-edge.down {
+  left: 0;
+  right: 0;
+  width: 100%;
+  height: 22%;
+  justify-content: center;
+}
+
+.tc-edge.up {
+  top: 34%;
+  bottom: auto;
+  height: 58px;
+  align-items: center;
+  padding: 0;
+  background: radial-gradient(ellipse, rgba(19, 46, 57, 0.72), transparent 68%);
+}
+
+.tc-edge.down {
+  top: auto;
+  bottom: calc(var(--safe-b) + var(--tc-lift) + var(--btn-small) + 8px);
+  height: 54px;
+  align-items: center;
+  padding: 0;
+  background: radial-gradient(ellipse, rgba(19, 46, 57, 0.72), transparent 68%);
+}
+
 .tc-edge svg {
   width: 40px;
   height: 40px;
@@ -890,8 +703,29 @@ h1 span:last-child {
   filter: drop-shadow(0 0 8px rgba(143, 227, 255, 0.8));
 }
 
+.tc-edge.up svg,
+.tc-edge.down svg {
+  width: 38px;
+  height: 38px;
+}
+
+.tc-edge.up::after,
+.tc-edge.down::after {
+  font: 800 10px var(--font-ui);
+  letter-spacing: 0.16em;
+  text-shadow: 0 0 12px rgba(143, 227, 255, 0.9);
+}
+
+.tc-edge.up::after {
+  content: 'JUMP';
+}
+
+.tc-edge.down::after {
+  content: 'SLAM';
+}
+
 .tc-edge.flash {
-  animation: edge-flash 0.35s ease-out;
+  animation: edge-flash 0.48s ease-out;
 }
 
 @keyframes edge-flash {
@@ -997,132 +831,79 @@ h1 span:last-child {
   height: 20px;
 }
 
+.touch-btn.boost {
+  border-color: rgba(143, 227, 255, 0.52);
+  color: var(--air);
+  background: radial-gradient(circle at 50% 30%, rgba(143, 227, 255, 0.2), rgba(9, 18, 26, 0.72) 72%);
+  box-shadow: 0 0 18px rgba(71, 193, 255, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+.touch-btn.boost span {
+  font-size: 8px;
+  letter-spacing: 0.08em;
+}
+
+.touch-btn.boost.empty {
+  opacity: 0.42;
+  filter: saturate(0.35);
+}
+
+.touch-btn.boost.active,
+.touch-btn.boost.held {
+  background: radial-gradient(circle, rgba(75, 205, 255, 0.55), rgba(18, 67, 91, 0.88));
+  box-shadow: 0 0 24px rgba(71, 193, 255, 0.62), inset 0 0 12px rgba(255, 255, 255, 0.28);
+}
+
+/* Item slot: an empty dashed ring with a faint star; once something is picked up it shows the item
+   on a gold ring that breathes until it is used. */
 .touch-btn.item {
-  opacity: 0.5;
+  border: 1.5px dashed rgba(255, 255, 255, 0.26);
+  background: rgba(13, 13, 18, 0.42);
+  box-shadow: none;
+  color: rgba(255, 255, 255, 0.32);
+}
+
+.touch-btn.item svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
 }
 
 .touch-btn.item.ready {
-  opacity: 1;
-  border-color: var(--gold);
-  color: var(--gold);
+  border: 2px solid var(--gold);
+  background: radial-gradient(circle, rgba(255, 198, 64, 0.28), rgba(13, 13, 18, 0.62) 70%);
+  animation: item-ready 1.6s ease-in-out infinite;
+}
+
+@keyframes item-ready {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 3px rgba(255, 198, 64, 0.14),
+      0 0 14px rgba(255, 198, 64, 0.35);
+  }
+  50% {
+    box-shadow:
+      0 0 0 7px rgba(255, 198, 64, 0.06),
+      0 0 26px rgba(255, 198, 64, 0.6);
+  }
 }
 
 .tc-item-icon {
   display: none;
-  width: 60%;
-  height: 60%;
+  width: 66%;
+  height: 66%;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
 }
 
 .touch-btn.item.ready .tc-item-icon {
   display: block;
 }
 
-.touch-btn.item.ready svg,
-.touch-btn.item.ready span {
+.touch-btn.item.ready svg {
   display: none;
-}
-
-/* JUMP stick: a ring with a knob that follows the thumb. */
-.stick {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: var(--stick);
-  height: var(--stick);
-  padding: 0;
-  border: 1.5px solid rgba(143, 227, 255, 0.4);
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(14, 12, 22, 0.2) 40%, rgba(14, 12, 22, 0.55) 72%);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35), inset 0 0 18px rgba(143, 227, 255, 0.12);
-  color: var(--air);
-  pointer-events: auto;
-  touch-action: none;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.stick-knob {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  align-items: center;
-  justify-content: center;
-  width: 56%;
-  height: 56%;
-  border: 1.5px solid rgba(143, 227, 255, 0.6);
-  border-radius: 50%;
-  background: radial-gradient(circle at 50% 35%, rgba(255, 255, 255, 0.2), rgba(14, 12, 22, 0.7) 75%);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
-  font: 700 11px var(--font-ui);
-  letter-spacing: 0.12em;
-  transform: translate(var(--kx, 0px), var(--ky, 0px));
-  transition: transform 0.05s, background 0.08s;
-}
-
-.stick-knob svg {
-  width: 30px;
-  height: 30px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2.6;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.stick.active .stick-knob {
-  background: radial-gradient(circle at 50% 35%, rgba(143, 227, 255, 0.45), rgba(14, 12, 22, 0.7) 75%);
-}
-
-/* Small chevrons on the ring: lanes left and right, slam down. They flash when used. */
-.stick-mark {
-  position: absolute;
-  width: 9px;
-  height: 9px;
-  border: solid currentColor;
-  border-width: 0 0 2px 2px;
-  opacity: 0.45;
-}
-
-.stick-mark.l {
-  left: 9px;
-  top: 50%;
-  translate: 0 -50%;
-  rotate: 45deg;
-}
-
-.stick-mark.r {
-  right: 9px;
-  top: 50%;
-  translate: 0 -50%;
-  rotate: -135deg;
-}
-
-.stick-mark.d {
-  bottom: 9px;
-  left: 50%;
-  translate: -50% 0;
-  rotate: -45deg;
-}
-
-.stick.flick-l .stick-mark.l,
-.stick.flick-r .stick-mark.r,
-.stick.flick-d .stick-mark.d {
-  animation: flick-pop 0.3s ease-out;
-}
-
-@keyframes flick-pop {
-  from {
-    opacity: 1;
-    scale: 1.8;
-  }
-  to {
-    opacity: 0.45;
-    scale: 1;
-  }
-}
-
-.touch-btn.item svg {
-  fill: currentColor;
-  stroke-width: 1.5;
 }
 
 .touch-btn.active {
@@ -1145,8 +926,6 @@ h1 span:last-child {
 
 .touch .icon-btn {
   top: var(--safe-t);
-  padding: 7px 10px;
-  font-size: 11px;
 }
 
 .touch .mute-btn {
@@ -1154,22 +933,8 @@ h1 span:last-child {
   right: var(--safe-r);
 }
 
-.touch .icon-btn {
-  min-width: 38px;
-  height: 34px;
-  justify-content: center;
-}
-
-.touch #mute-label {
-  display: none;
-}
-
-.touch .mute-icon {
-  display: block;
-}
-
 .touch #btn-pause {
-  right: calc(var(--safe-r) + 46px);
+  right: calc(var(--safe-r) + 48px);
 }
 
 .touch .hud-power {
@@ -1217,7 +982,7 @@ h1 span:last-child {
   .touch .hud-air {
     top: auto;
     bottom: calc(var(--safe-b) + 4px);
-    width: min(320px, calc(100% - 2 * var(--safe-l) - 2 * (var(--stick) + 20px)));
+    width: min(320px, calc(100% - 2 * var(--safe-l) - 150px));
   }
   .touch .hud-slots {
     top: calc(var(--safe-t) + 40px);
@@ -1233,175 +998,8 @@ h1 span:last-child {
   }
 }
 
-/* Pilot card: a badge with the name's initials, the name, and an edit button. */
-.pilot {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  margin: -6px 0 16px;
-  padding: 10px 10px 10px 12px;
-  border-left: 3px solid var(--accent);
-  background: var(--surface-2);
-}
-
-.pilot-badge {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: 42px;
-  height: 42px;
-  background: var(--accent);
-  color: #fff;
-  font: 700 16px var(--font-num);
-  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
-}
-
-.pilot-text {
-  flex: 1;
-  min-width: 0;
-}
-
-.pilot label {
-  display: block;
-  font-size: 11px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--ink-dim);
-}
-
-.pilot b {
-  display: block;
-  overflow: hidden;
-  font-family: var(--font-num);
-  font-size: 18px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.pilot-edit {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: 38px;
-  height: 38px;
-  border: none;
-  background: var(--surface-3);
-  color: var(--ink);
-  cursor: pointer;
-  transition: background 0.12s;
-}
-
-.pilot-edit:hover {
-  background: var(--accent);
-}
-
-.pilot-edit svg {
-  width: 18px;
-  height: 18px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2;
-  stroke-linejoin: round;
-}
-
-.link-btn {
-  padding: 2px 6px;
-  border: none;
-  background: none;
-  color: var(--accent);
-  font: 600 13px var(--font-ui);
-  letter-spacing: 0.08em;
-  cursor: pointer;
-}
-
-.link-btn:hover {
-  text-decoration: underline;
-}
-
-.menu-buttons,
-.button-row {
-  display: flex;
-  gap: 10px;
-}
-
-.button-row {
-  width: 100%;
-}
-
-.button-row .btn {
-  flex: 1;
-}
-
-.challenge {
-  margin: 0 0 14px;
-  padding: 8px 12px;
-  border-left: 3px solid var(--gold);
-  background: rgba(255, 198, 64, 0.12);
-  font-size: 14px;
-}
-
-.panel .challenge {
-  margin: 0;
-}
-
-.rank-line {
-  margin: 0;
-  min-height: 1.2em;
-  font-size: 14px;
-  color: var(--ink-dim);
-  text-align: center;
-}
-
-.modal {
-  z-index: 10;
-  background: rgba(6, 6, 10, 0.78);
-}
-
-.callsign-row {
-  display: flex;
-  gap: 8px;
-  width: 100%;
-}
-
-.callsign-row input {
-  flex: 1;
-  min-width: 0;
-  padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-radius: 0;
-  outline: none;
-  background: var(--surface);
-  color: var(--ink);
-  font: 600 18px var(--font-num);
-  user-select: text;
-  -webkit-user-select: text;
-}
-
-.callsign-row input:focus {
-  border-color: var(--accent);
-}
-
-.callsign-row input::placeholder {
-  color: rgba(246, 241, 234, 0.35);
-}
-
-.panel .callsign-row .btn {
-  flex: none;
-  width: auto;
-  padding: 10px 14px;
-  font-size: 14px;
-}
-
-.form-error {
-  min-height: 1.2em;
-  margin: 0;
-  font-size: 13px;
-  color: var(--accent);
-}
-
 @media (max-width: 720px) {
-  .hints,
-  .controls {
+  .hints {
     display: none;
   }
   .hud-score {
@@ -1409,93 +1007,496 @@ h1 span:last-child {
   }
 }
 
-/* ---------- Small screens ---------- */
+/* =====================================================================================
+   Menus
+   Home, pause and game over share one layout: a solid sheet down the left (along the bottom on
+   portrait phones) holding a list menu. One item is highlighted at a time: the arrows or a
+   controller move it, Enter / A picks it, and a mouse or a finger picks directly.
+   ===================================================================================== */
 
-@media (max-width: 720px), (max-height: 680px) {
-  .panel {
-    padding: 20px 22px;
-    gap: 10px;
-  }
-  .big-score {
-    font-size: 44px;
-  }
-  .run-stats {
-    gap: 16px;
+:root {
+  --sheet-w: clamp(340px, 34vw, 440px);
+  --sheet-px: clamp(28px, 3.2vw, 44px);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+}
+
+/* A soft shadow from the sheet across the scene, so the sheet doesn't end in a hard line. */
+#menu,
+#over {
+  background: linear-gradient(90deg, rgba(13, 13, 18, 0.6) var(--sheet-w), rgba(13, 13, 18, 0) calc(var(--sheet-w) + 240px));
+}
+
+/* Pause also dims the frozen road; game over leaves the wreck in full view. */
+#pause {
+  background:
+    linear-gradient(90deg, rgba(13, 13, 18, 0.6) var(--sheet-w), rgba(13, 13, 18, 0) calc(var(--sheet-w) + 240px)),
+    rgba(6, 6, 10, 0.38);
+}
+
+.screen.center {
+  align-items: center;
+  justify-content: center;
+}
+
+.modal {
+  z-index: 10;
+  padding: 16px;
+  background: rgba(6, 6, 10, 0.74);
+}
+
+.sheet {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  width: var(--sheet-w);
+  padding: clamp(28px, 7vh, 64px) var(--sheet-px) clamp(24px, 5vh, 44px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  background: var(--surface);
+  scrollbar-width: none;
+}
+
+.sheet::-webkit-scrollbar {
+  display: none;
+}
+
+.menu-home {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+/* ---------- Wordmark ---------- */
+
+.wordmark h1,
+.wordmark-type {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  font: italic 800 clamp(54px, 5.4vw, 78px) / 0.84 var(--font-display);
+  letter-spacing: -0.005em;
+  text-transform: uppercase;
+}
+
+.wordmark h1 span:last-child,
+.wordmark-type span:last-child {
+  color: var(--accent);
+}
+
+.tagline {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin: 16px 0 0;
+  font: 600 12px var(--font-ui);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+/* Livery stripes ahead of the tagline. */
+.tagline::before {
+  content: '';
+  flex: none;
+  width: 26px;
+  height: 10px;
+  background: repeating-linear-gradient(115deg, var(--accent) 0 4px, transparent 4px 8px);
+}
+
+/* ---------- List menu ---------- */
+
+/* The highlight runs from the screen edge and ends in a slant that follows the italic type. */
+.menu-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: auto 0 auto calc(-1 * var(--sheet-px));
+  padding: 32px 0;
+}
+
+.menu-item {
+  --h: 50px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  height: var(--h);
+  flex: none;
+  padding: 0 26px 0 var(--sheet-px);
+  border: none;
+  background: none;
+  color: rgba(246, 241, 234, 0.56);
+  font: italic 700 25px var(--font-display);
+  letter-spacing: 0.01em;
+  text-align: left;
+  text-transform: uppercase;
+  cursor: pointer;
+  clip-path: polygon(0 0, 100% 0, calc(100% - 16px) 100%, 0 100%);
+  transition:
+    color 0.12s,
+    background-color 0.12s,
+    padding 0.18s ease-out;
+}
+
+.menu-item > span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.menu-item.primary {
+  --h: 66px;
+  color: var(--ink);
+  font-size: 38px;
+}
+
+.menu-item.focus {
+  padding-left: calc(var(--sheet-px) + 10px);
+  background: var(--accent);
+  color: #fff;
+}
+
+.menu-item .meta {
+  font: 600 13px var(--font-ui);
+  letter-spacing: 0.14em;
+  color: var(--ink-dim);
+}
+
+.menu-item.focus .meta {
+  color: rgba(255, 255, 255, 0.86);
+}
+
+/* Settings switches: the state word is bright when on. */
+.menu-item.toggle.on .meta {
+  color: var(--ink);
+}
+
+.menu-item.toggle.focus .meta {
+  color: #fff;
+}
+
+.menu-item .chev {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0;
+  transform: translateX(-6px);
+  transition:
+    opacity 0.15s,
+    transform 0.18s ease-out;
+}
+
+.menu-item.focus .chev {
+  opacity: 1;
+  transform: none;
+}
+
+/* ---------- Pilot and records ---------- */
+
+.profile {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding-top: 22px;
+  border-top: 1px solid var(--line);
+}
+
+.pilot {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.pilot-badge {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 42px;
+  height: 40px;
+  background: var(--accent);
+  color: #fff;
+  font: italic 800 18px var(--font-display);
+  clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
+}
+
+.pilot-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.pilot-text b {
+  overflow: hidden;
+  font: 700 18px/1.2 var(--font-ui);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pilot-text small,
+.figures dt,
+.shop-label span,
+.keys th {
+  font: 600 11px var(--font-ui);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.pilot-edit,
+.back-btn,
+.close-btn {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: none;
+  color: var(--ink-dim);
+  cursor: pointer;
+  transition:
+    color 0.12s,
+    border-color 0.12s,
+    background 0.12s;
+}
+
+.pilot-edit:hover,
+.back-btn:hover,
+.close-btn:hover {
+  border-color: rgba(255, 255, 255, 0.34);
+  color: var(--ink);
+}
+
+.pilot-edit svg,
+.back-btn svg,
+.close-btn svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.figures {
+  display: flex;
+  gap: clamp(20px, 2.4vw, 32px);
+  margin: 0;
+}
+
+.figures div {
+  min-width: 0;
+}
+
+.figures dd {
+  margin: 3px 0 0;
+  font: 700 26px/1.05 var(--font-num);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.figures dd small {
+  margin-left: 3px;
+  font-size: 0.62em;
+  color: var(--ink-dim);
+}
+
+.challenge {
+  margin: 26px 0 0;
+  padding: 10px 14px;
+  border-left: 3px solid var(--gold);
+  background: rgba(255, 198, 64, 0.08);
+  font: 500 14px/1.4 var(--font-ui);
+}
+
+/* ---------- Paint shop (replaces the home menu inside the sheet) ---------- */
+
+.menu-shop {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  margin: auto 0;
+  animation: sheet-in 0.22s ease-out;
+}
+
+@keyframes sheet-in {
+  from {
+    transform: translateX(-14px);
   }
 }
 
-/* Portrait phones: the car is framed in the top half, the menu sits underneath it. */
-@media (orientation: portrait) and (max-width: 720px) {
-  /* The sidebar becomes a solid sheet across the bottom, with the red edge on top. */
-  #menu {
-    flex-direction: column;
-    justify-content: flex-end;
-  }
-  .menu-panel {
-    width: 100%;
-    max-height: 64%;
-    padding: 20px 20px max(20px, env(safe-area-inset-bottom));
-    border-right: none;
-    border-top: 3px solid var(--accent);
-    box-shadow: 0 -18px 60px rgba(0, 0, 0, 0.45);
-  }
-  .menu-panel h1 {
-    flex-direction: row;
-    gap: 0.3em;
-    margin-bottom: 14px;
-    font-size: clamp(30px, 10vw, 48px);
-  }
-  .stats {
-    margin-bottom: 16px;
-  }
-  .eyebrow,
-  .touch .touch-note {
-    display: none;
-  }
+.sheet-head {
+  display: flex;
+  gap: 14px;
+  align-items: center;
 }
 
-/* Landscape phones: short screens get a compact menu column. */
-@media (orientation: landscape) and (max-height: 680px) {
-  .menu-panel {
-    width: min(400px, 46vw);
-    padding: 14px 22px;
-    justify-content: flex-start;
-  }
-  .menu-panel h1 {
-    flex-direction: row;
-    gap: 0.3em;
-    margin-bottom: 10px;
-    font-size: clamp(24px, 6.5vh, 34px);
-  }
-  .pilot {
-    margin-bottom: 10px;
-    padding: 6px 8px 6px 10px;
-  }
-  .pilot-badge {
-    width: 34px;
-    height: 34px;
-    font-size: 13px;
-  }
-  .stats > div {
-    padding: 6px 10px 8px;
-  }
-  .btn.play {
-    padding: 12px 20px;
-    font-size: 19px;
-  }
-  .eyebrow {
-    font-size: 11px;
-  }
-  .stats {
-    margin-bottom: 12px;
-  }
-  .btn {
-    padding: 10px 20px;
-    font-size: 16px;
-  }
-  .note {
-    font-size: 12px;
-  }
+.sheet-head > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.sheet-head h2 {
+  margin: 0;
+  font: italic 800 38px/0.9 var(--font-display);
+  text-transform: uppercase;
+}
+
+.sheet-head small {
+  display: block;
+  margin-top: 5px;
+  font: 600 12px var(--font-ui);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.paint-total {
+  align-self: flex-start;
+  padding: 3px 8px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  font: 700 15px var(--font-num);
+  color: var(--ink-dim);
+  white-space: nowrap;
+}
+
+.shop-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+  transition: border-color 0.15s;
+}
+
+.shop-label b {
+  overflow: hidden;
+  font: italic 700 20px var(--font-display);
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* The row the arrows are working on. */
+.shop-row.active .shop-label {
+  border-bottom-color: var(--accent);
+}
+
+.shop-row.active .shop-label span {
+  color: var(--ink);
+}
+
+.swatches {
+  --sw-size: 40px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--sw-size), 1fr));
+  gap: 12px 8px;
+}
+
+/* A round paint chip with a highlight and some shade, so it reads as a glossy finish. */
+.swatch {
+  position: relative;
+  justify-self: center;
+  width: var(--sw-size);
+  height: var(--sw-size);
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0) 42%),
+    radial-gradient(circle at 70% 82%, rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0) 55%),
+    var(--sw);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+  cursor: pointer;
+  transition:
+    transform 0.12s,
+    box-shadow 0.12s;
+}
+
+.swatch:hover {
+  transform: scale(1.08);
+}
+
+.swatch.selected {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.16),
+    0 0 0 3px var(--surface),
+    0 0 0 5px var(--ink);
+}
+
+.shop-row.active .swatch.cursor {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.16),
+    0 0 0 3px var(--surface),
+    0 0 0 5px var(--accent);
+}
+
+/* Factory finish: the car's own colour, marked F. */
+.swatch.factory::after {
+  content: 'F';
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font: italic 800 16px var(--font-display);
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+}
+
+.swatch.locked::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(13, 13, 18, 0.66);
+}
+
+.swatch.locked::after {
+  content: '';
+  position: absolute;
+  inset: 30%;
+  background: var(--ink-dim);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M7 10V8a5 5 0 0110 0v2h1.5v11h-13V10zm2.5 0h5V8a2.5 2.5 0 00-5 0z'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M7 10V8a5 5 0 0110 0v2h1.5v11h-13V10zm2.5 0h5V8a2.5 2.5 0 00-5 0z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+.paint-status {
+  min-height: 2.9em;
+  margin: 0;
+  font: 500 14px/1.45 var(--font-ui);
+  color: var(--ink-dim);
+}
+
+.paint-status b {
+  font-weight: 700;
+  color: var(--ink);
 }
 
 /* ---------- Garage (car picker) ---------- */
@@ -1506,8 +1507,8 @@ h1 span:last-child {
   --cy: 50vh;
   --half: 160px;
   --info-y: 65vh;
-  --arrow: 56px;
-  --gap: 14px;
+  --arrow: 52px;
+  --gap: 18px;
   position: absolute;
   inset: 0;
   pointer-events: none;
@@ -1520,18 +1521,23 @@ h1 span:last-child {
   place-items: center;
   width: var(--arrow);
   height: var(--arrow);
-  border: none;
-  background: var(--surface);
+  padding: 0;
+  border: 1.5px solid rgba(255, 255, 255, 0.32);
+  border-radius: 50%;
+  background: rgba(13, 13, 18, 0.5);
   color: var(--ink);
   cursor: pointer;
   pointer-events: auto;
   touch-action: manipulation;
   translate: 0 -50%;
-  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
-  transition: background 0.12s, transform 0.12s, border-color 0.12s;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s,
+    transform 0.12s;
 }
 
-/* Either side of the car, kept on screen. */
+/* Either side of the car, kept on screen and clear of the sheet. */
 .garage-arrow.prev {
   left: max(var(--min-left, 12px), calc(var(--cx) - var(--half) - var(--gap) - var(--arrow)));
 }
@@ -1541,32 +1547,34 @@ h1 span:last-child {
 }
 
 .garage-arrow:hover {
-  background: var(--accent);
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--surface);
 }
 
 .garage-arrow:active {
-  transform: scale(0.9);
+  transform: scale(0.92);
 }
 
 .garage-arrow svg {
-  width: 26px;
-  height: 26px;
+  width: 22px;
+  height: 22px;
   fill: none;
   stroke: currentColor;
-  stroke-width: 2.6;
+  stroke-width: 2.4;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 
 .garage-arrow.prev svg {
-  margin-right: 3px;
+  margin-right: 2px;
 }
 
 .garage-arrow.next svg {
-  margin-left: 3px;
+  margin-left: 2px;
 }
 
-/* The caption sits under the car, centred on it: just the name and a line about it, no box. */
+/* The caption sits under the car, centred on it: name, a line about it, and which car of how many. */
 .garage-info {
   position: absolute;
   left: var(--info-x, var(--cx));
@@ -1575,39 +1583,573 @@ h1 span:last-child {
   max-width: calc(100% - 24px);
   text-align: center;
   white-space: nowrap;
-  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.7), 0 1px 3px rgba(0, 0, 0, 0.6);
+  text-shadow:
+    0 2px 18px rgba(0, 0, 0, 0.75),
+    0 1px 3px rgba(0, 0, 0, 0.6);
 }
 
 .garage-info b {
   display: block;
-  font-size: clamp(26px, 3.4vw, 38px);
-  letter-spacing: 0.08em;
-  line-height: 1.1;
+  font: italic 800 clamp(34px, 3.8vw, 50px) / 0.95 var(--font-display);
+  text-transform: uppercase;
 }
 
 .garage-info small {
   display: block;
-  margin-top: 2px;
-  font-size: 14px;
-  letter-spacing: 0.04em;
-  color: var(--ink-dim);
+  margin-top: 6px;
+  font: 500 15px var(--font-ui);
+  color: rgba(246, 241, 234, 0.78);
+}
+
+.car-pips {
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+  margin-top: 12px;
+}
+
+.car-pips i {
+  width: 18px;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.3);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  transform: skewX(-24deg);
+  transition: background 0.2s;
+}
+
+.car-pips i.on {
+  background: var(--accent);
 }
 
 .garage-info.swap b {
-  animation: bump 0.3s ease-out;
+  animation: car-swap 0.28s ease-out;
 }
 
-@media (max-width: 720px), (max-height: 680px) {
-  .garage {
-    --arrow: 46px;
-    --gap: 6px;
+@keyframes car-swap {
+  from {
+    transform: translateX(var(--swap-from, 16px));
   }
-  .garage-info b {
-    font-size: 26px;
+}
+
+/* ---------- Pause and game over ---------- */
+
+.sheet-title h2 {
+  margin: 0;
+  font: italic 800 clamp(50px, 5vw, 68px) / 0.86 var(--font-display);
+  text-transform: uppercase;
+}
+
+.run-line {
+  margin: 14px 0 0;
+  font: 600 12px var(--font-ui);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.reason {
+  margin: 0;
+  font: 700 12px var(--font-ui);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.big-score {
+  margin-top: 8px;
+  font: italic 800 clamp(66px, 7vw, 100px) / 0.86 var(--font-num);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.score-label {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin: 10px 0 0;
+  font: 600 12px var(--font-ui);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.record {
+  padding: 3px 12px 2px;
+  background: var(--gold);
+  color: #1a1200;
+  font: italic 800 16px var(--font-display);
+  letter-spacing: 0.06em;
+  clip-path: polygon(5px 0, 100% 0, calc(100% - 5px) 100%, 0 100%);
+  animation: record-in 0.5s 0.15s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+
+@keyframes record-in {
+  from {
+    transform: scale(0.6);
   }
-  .garage-info small {
-    font-size: 12px;
+}
+
+#over .figures {
+  margin-top: 28px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+#over .challenge {
+  margin-top: 20px;
+}
+
+.status-line {
+  min-height: 1.4em;
+  margin: 14px 0 0;
+  font: 500 14px var(--font-ui);
+  color: var(--ink-dim);
+}
+
+/* Pause and game over: the title or result and the choices sit together, centred down the sheet
+   (auto margins rather than centring, so a sheet too short for them still scrolls from the top). */
+#pause .sheet > :first-child,
+#over .sheet > :first-child {
+  margin-top: auto;
+}
+
+#pause .menu-list,
+#over .menu-list {
+  margin-top: 0;
+  margin-bottom: auto;
+  padding: 36px 0 0;
+}
+
+/* ---------- Buttons and cards (name prompt, how to play, photo mode) ---------- */
+
+.btn {
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  height: 44px;
+  padding: 0 22px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--surface-2);
+  color: var(--ink);
+  font: italic 700 19px var(--font-display);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 0.12s,
+    border-color 0.12s;
+}
+
+.btn:hover {
+  border-color: #3d3d4a;
+  background: var(--surface-3);
+}
+
+.btn.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+.btn.primary:hover {
+  border-color: #ff5465;
+  background: #ff5465;
+}
+
+.btn svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.card {
+  width: min(440px, 100%);
+  max-height: 100%;
+  padding: 26px 28px 28px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
+  animation: card-in 0.2s ease-out;
+}
+
+@keyframes card-in {
+  from {
+    transform: translateY(10px);
   }
+}
+
+.card-head {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.card-head h2 {
+  margin: 0;
+  font: italic 800 36px/0.95 var(--font-display);
+  text-transform: uppercase;
+}
+
+.card-text {
+  margin: 0 0 18px;
+  font: 500 14px/1.5 var(--font-ui);
+  color: var(--ink-dim);
+}
+
+.callsign-row {
+  display: flex;
+  gap: 8px;
+}
+
+.callsign-row input {
+  flex: 1;
+  min-width: 0;
+  height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  outline: none;
+  background: var(--surface-2);
+  color: var(--ink);
+  font: 600 18px var(--font-ui);
+  user-select: text;
+  -webkit-user-select: text;
+  transition: border-color 0.12s;
+}
+
+.callsign-row input:focus {
+  border-color: var(--accent);
+}
+
+.callsign-row input::placeholder {
+  color: rgba(246, 241, 234, 0.34);
+}
+
+.form-error {
+  min-height: 1.4em;
+  margin: 10px 0 8px;
+  font: 500 13px var(--font-ui);
+  color: #ff6b79;
+}
+
+.card-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.card-buttons .btn {
+  min-width: 112px;
+}
+
+/* How to play */
+.howto {
+  width: min(660px, 100%);
+}
+
+.keys {
+  width: 100%;
+  border-collapse: collapse;
+  font: 500 14px var(--font-ui);
+}
+
+.keys th {
+  padding: 0 16px 8px 0;
+  text-align: left;
+}
+
+.keys td {
+  padding: 8px 16px 8px 0;
+  border-top: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.keys td:first-child {
+  width: 100%;
+  white-space: normal;
+  color: var(--ink-dim);
+}
+
+.gestures,
+.rules {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font: 500 14px/1.45 var(--font-ui);
+  color: var(--ink-dim);
+}
+
+.gestures {
+  display: none;
+}
+
+.touch .keys {
+  display: none;
+}
+
+.touch .gestures {
+  display: grid;
+}
+
+.rules {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.gestures li,
+.rules li {
+  position: relative;
+  padding-left: 18px;
+}
+
+.gestures li::before,
+.rules li::before {
+  content: '';
+  position: absolute;
+  left: 1px;
+  top: 0.55em;
+  width: 7px;
+  height: 7px;
+  background: var(--accent);
+  transform: skewX(-20deg);
+}
+
+.gestures b,
+.rules b {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+/* Controller buttons, in their usual colours. */
+kbd.pad-glyph {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  min-width: 0;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--ink);
+  color: #111;
+  font: 800 12px var(--font-display);
+}
+
+kbd.pad-glyph.a {
+  background: #5ccf6a;
+}
+
+kbd.pad-glyph.b {
+  background: #ff5f57;
+}
+
+kbd.pad-glyph.x {
+  background: #4ea4ff;
+}
+
+kbd.pad-glyph.y {
+  background: #ffc640;
+}
+
+kbd.dpad {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 22px;
+  padding: 0;
+}
+
+kbd.dpad svg {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+}
+
+/* ---------- Button prompts ---------- */
+
+.prompts {
+  position: fixed;
+  right: 24px;
+  bottom: 20px;
+  z-index: 11;
+  display: flex;
+  gap: 22px;
+  align-items: center;
+  font: 600 13px var(--font-ui);
+  letter-spacing: 0.04em;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+}
+
+.prompts:empty,
+.touch .prompts {
+  display: none;
+}
+
+.prompt {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.prompt span {
+  margin-left: 2px;
+}
+
+.prompt kbd:not(.pad-glyph):not(.dpad),
+.keys kbd:not(.pad-glyph) {
+  display: inline-grid;
+  place-items: center;
+  min-width: 24px;
+  height: 22px;
+  padding: 0 6px;
+  font-size: 13px;
+  text-shadow: none;
+}
+
+.prompt kbd {
+  text-shadow: none;
+}
+
+/* Keyboard keys, or controller buttons while a pad is in use. */
+html:not(.pad) .prompt kbd.p,
+html.pad .prompt kbd.k {
+  display: none;
+}
+
+/* ---------- Photo mode ---------- */
+
+.photo {
+  position: fixed;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.photo-bar {
+  position: absolute;
+  left: 50%;
+  bottom: max(20px, env(safe-area-inset-bottom));
+  display: flex;
+  gap: 28px;
+  align-items: center;
+  width: max-content;
+  max-width: calc(100% - 32px);
+  padding: 10px 10px 10px 20px;
+  border-radius: 4px;
+  background: var(--surface);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
+  pointer-events: auto;
+  translate: -50% 0;
+  transition:
+    opacity 0.2s,
+    translate 0.2s;
+}
+
+.photo-help {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  font: 500 13px var(--font-ui);
+  color: var(--ink-dim);
+}
+
+.photo-help b {
+  font: italic 800 19px var(--font-display);
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.photo-help span {
+  display: none;
+}
+
+html:not(.touch):not(.pad) .photo-help .mouse-help,
+html.touch:not(.pad) .photo-help .touch-help,
+html.pad .photo-help .pad-help {
+  display: inline;
+}
+
+.photo-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.photo.saving .photo-bar {
+  opacity: 0;
+  translate: -50% 16px;
+}
+
+.photo-flash {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  opacity: 0;
+}
+
+.photo-flash.go {
+  animation: shutter 0.45s ease-out;
+}
+
+@keyframes shutter {
+  from {
+    opacity: 0.85;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+body.photo-mode .mute-btn {
+  display: none;
+}
+
+body.photo-mode #game {
+  cursor: grab;
+}
+
+body.photo-mode #game:active {
+  cursor: grabbing;
+}
+
+/* ---------- Toast ---------- */
+
+.toast {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  z-index: 20;
+  max-width: calc(100% - 32px);
+  padding: 11px 18px 11px 15px;
+  border-left: 3px solid var(--accent);
+  background: var(--surface);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  font: 600 14px var(--font-ui);
+  opacity: 0;
+  pointer-events: none;
+  translate: -50% -10px;
+  transition:
+    opacity 0.2s,
+    translate 0.2s;
+}
+
+.toast.show {
+  opacity: 1;
+  translate: -50% 0;
 }
 
 /* ---------- Loading screen ---------- */
@@ -1623,12 +2165,12 @@ h1 span:last-child {
 }
 
 .loading-inner {
-  width: min(360px, 100%);
+  width: min(320px, 100%);
 }
 
-.loading h1 {
-  margin-bottom: 24px;
-  font-size: clamp(40px, 11vw, 64px);
+.loading .wordmark-type {
+  margin-bottom: 28px;
+  font-size: clamp(52px, 13vw, 76px);
 }
 
 /* No real progress to report, so a light sweeps along the bar while the game gets ready. */
@@ -1651,5 +2193,260 @@ h1 span:last-child {
   }
   to {
     transform: translateX(300%);
+  }
+}
+
+/* ---------- Smaller screens ---------- */
+
+/* Short desktop windows: tighter spacing, same layout. */
+@media (max-height: 760px) {
+  .sheet {
+    padding-top: clamp(22px, 5vh, 40px);
+  }
+  .menu-list {
+    padding: 22px 0;
+  }
+  .menu-item {
+    --h: 46px;
+    font-size: 23px;
+  }
+  .menu-item.primary {
+    --h: 58px;
+    font-size: 34px;
+  }
+  .profile {
+    gap: 16px;
+    padding-top: 18px;
+  }
+  .menu-shop {
+    gap: 22px;
+  }
+}
+
+/* Portrait phones: the car is framed in the top part, the sheet sits along the bottom. */
+@media (orientation: portrait) and (max-width: 720px) {
+  :root {
+    --sheet-w: 100%;
+    --sheet-px: 20px;
+  }
+  .screen:not(.center) {
+    flex-direction: column;
+    justify-content: flex-end;
+  }
+  #menu,
+  #over {
+    background: none;
+  }
+  #pause {
+    background: rgba(6, 6, 10, 0.38);
+  }
+  .sheet {
+    max-height: 64%;
+    padding: 22px var(--sheet-px) max(18px, env(safe-area-inset-bottom));
+    box-shadow: 0 -40px 60px -24px rgba(13, 13, 18, 0.9);
+  }
+  .wordmark h1 {
+    flex-direction: row;
+    gap: 0.2em;
+    font-size: clamp(32px, 10vw, 44px);
+  }
+  .tagline {
+    display: none;
+  }
+  .menu-list {
+    padding: 16px 0 18px;
+  }
+  .menu-item {
+    --h: 46px;
+    font-size: 23px;
+  }
+  .menu-item.primary {
+    --h: 58px;
+    font-size: 32px;
+  }
+  .challenge {
+    margin-top: 14px;
+  }
+  .profile {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 14px 20px;
+    padding-top: 16px;
+  }
+  .pilot {
+    flex: 1 1 100%;
+  }
+  .figures dd {
+    font-size: 22px;
+  }
+  .sheet-title h2 {
+    font-size: 42px;
+  }
+  .big-score {
+    font-size: 64px;
+  }
+  #over .figures {
+    margin-top: 16px;
+    padding-top: 14px;
+  }
+  .status-line {
+    margin-top: 8px;
+  }
+  #pause .menu-list,
+  #over .menu-list {
+    padding-top: 16px;
+  }
+  .menu-shop {
+    gap: 18px;
+    margin: 0;
+  }
+  .sheet-head h2 {
+    font-size: 32px;
+  }
+  .swatches {
+    --sw-size: 36px;
+  }
+  .paint-status {
+    min-height: 0;
+  }
+  .garage {
+    --arrow: 44px;
+    --gap: 8px;
+  }
+  .garage-info b {
+    font-size: 34px;
+  }
+  .garage-info small {
+    font-size: 13px;
+  }
+  .card {
+    padding: 22px 20px 22px;
+  }
+  .card-head h2 {
+    font-size: 30px;
+  }
+  .photo-bar {
+    gap: 14px;
+    padding-left: 14px;
+  }
+  .photo-help span {
+    display: none !important;
+  }
+}
+
+/* Landscape phones: a narrow, compact sheet so the car keeps most of the screen. */
+@media (orientation: landscape) and (max-height: 520px) {
+  :root {
+    --sheet-w: min(340px, 44vw);
+    --sheet-px: 22px;
+  }
+  .sheet {
+    padding: max(14px, env(safe-area-inset-top)) var(--sheet-px) 14px max(var(--sheet-px), env(safe-area-inset-left));
+  }
+  .wordmark h1 {
+    flex-direction: row;
+    gap: 0.2em;
+    font-size: 30px;
+  }
+  .tagline {
+    display: none;
+  }
+  .menu-list {
+    padding: 10px 0;
+  }
+  .menu-item {
+    --h: 36px;
+    font-size: 19px;
+  }
+  .menu-item.primary {
+    --h: 44px;
+    font-size: 26px;
+  }
+  .challenge {
+    margin-top: 10px;
+    padding: 6px 10px;
+    font-size: 13px;
+  }
+  .profile {
+    gap: 10px;
+    padding-top: 10px;
+  }
+  .pilot-badge {
+    width: 34px;
+    height: 32px;
+    font-size: 15px;
+  }
+  .pilot-edit {
+    width: 32px;
+    height: 32px;
+  }
+  .figures dd {
+    font-size: 19px;
+  }
+  .sheet-title h2 {
+    font-size: 34px;
+  }
+  .run-line {
+    margin-top: 8px;
+  }
+  .big-score {
+    font-size: 46px;
+  }
+  .score-label {
+    margin-top: 6px;
+  }
+  #over .figures {
+    margin-top: 12px;
+    padding-top: 10px;
+  }
+  #over .challenge {
+    margin-top: 10px;
+  }
+  .status-line {
+    min-height: 0;
+    margin-top: 6px;
+  }
+  #pause .menu-list,
+  #over .menu-list {
+    padding-top: 10px;
+  }
+  .menu-shop {
+    gap: 12px;
+    margin: 0;
+  }
+  .sheet-head h2 {
+    font-size: 28px;
+  }
+  .back-btn {
+    width: 32px;
+    height: 32px;
+  }
+  .shop-label {
+    margin-bottom: 8px;
+    padding-bottom: 4px;
+  }
+  .swatches {
+    --sw-size: 30px;
+    gap: 8px 6px;
+  }
+  .paint-status {
+    min-height: 0;
+    font-size: 12px;
+  }
+  .garage {
+    --arrow: 42px;
+    --gap: 8px;
+  }
+  .garage-info b {
+    font-size: 28px;
+  }
+  .garage-info small {
+    font-size: 12px;
+  }
+  .car-pips {
+    margin-top: 8px;
+  }
+  .card {
+    padding: 18px 20px;
   }
 }
