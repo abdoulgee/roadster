@@ -1,11 +1,13 @@
 import { Game } from './game';
+import { initAnalytics } from './analytics';
 import { initPwa } from './pwa';
 
 const canvas = document.getElementById('game') as HTMLCanvasElement;
 const loader = document.getElementById('loading')!;
 
-// Service worker and the home-screen invitation; listeners go up before the world is built.
+// Service worker, home-screen invitation and anonymous usage stats; all fire-and-forget.
 initPwa();
+initAnalytics();
 
 // The loading screen covers only the time the game needs to get ready, then gets out of the way.
 async function boot() {

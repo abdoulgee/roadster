@@ -15,6 +15,17 @@ const SHOWN_KEY = 'roadster.install.shown';
 const DISMISSED_KEY = 'roadster.install.dismissed';
 const INSTALLED_KEY = 'roadster.installed';
 
+const DEFAULT_TITLE = 'Take the highway with you';
+const DEFAULT_TEXT =
+  'Add Drive Roadster to your home screen for full-screen runs and one-tap access. It still opens when the signal drops.';
+const MANUAL_TITLE = 'Put Roadster on your home screen';
+const IOS_TEXT =
+  'A home-screen app gets the full screen and opens without a signal. Your browser keeps it two taps away.';
+const ANDROID_TEXT =
+  'A home-screen app gets the full screen and opens without a signal. Your browser can add it in a few taps.';
+
+type Mode = 'native' | 'ios' | 'manual';
+
 /** Dialogs that, while open, mean the menu isn't the screen in front of the player. */
 const OTHER_DIALOGS = ['callsign', 'howto', 'pause', 'over', 'photo'];
 
@@ -69,6 +80,10 @@ function isIos() {
   return /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 }
 
+function isAndroid() {
+  return /Android/i.test(navigator.userAgent);
+}
+
 function toast(text: string, ms = 2800) {
   const el = document.getElementById('toast');
   if (!el) return;
@@ -84,17 +99,32 @@ class InstallInvitation {
   private readonly laterBtn = document.getElementById('btn-install-later') as HTMLButtonElement | null;
   private readonly title = document.getElementById('install-title');
   private readonly text = document.getElementById('install-text');
-  private readonly steps = document.getElementById('install-steps');
+  private readonly stepsIos = document.getElementById('install-steps');
+  private readonly stepsAndroid = document.getElementById('install-steps-android');
+  private readonly note = document.getElementById('install-note');
 
   private deferred: BeforeInstallPromptEvent | null = null;
   private visible = false;
   private started = false;
   private timer = 0;
+  private readySince = 0;
+  private mode: Mode = 'native';
   private readonly waitingSince = Date.now();
   private readonly ios = isIos();
+  private readonly android = isAndroid();
 
   constructor() {
-    if (!this.el || !this.installBtn || !this.laterBtn || !this.title || !this.text || !this.steps) return;
+    if (
+      !this.el ||
+      !this.installBtn ||
+      !this.laterBtn ||
+      !this.title ||
+      !this.text ||
+      !this.stepsIos ||
+      !this.stepsAndroid ||
+      !this.note
+    )
+      return;
 
     this.installBtn.addEventListener('click', () => void this.install());
     this.laterBtn.addEventListener('click', () => this.dismiss());
@@ -123,7 +153,11 @@ class InstallInvitation {
   private onBeforeInstall = (event: Event) => {
     event.preventDefault();
     this.deferred = event as BeforeInstallPromptEvent;
-    if (this.visible) return;
+    if (this.visible) {
+      // The card may already be showing browser-menu steps; upgrade it to the native button.
+      if (!this.ios && this.mode !== 'native') this.setMode('native');
+      return;
+    }
     if (this.started) {
       this.schedule(400);
       return;
@@ -170,22 +204,46 @@ class InstallInvitation {
       this.started = false;
       return;
     }
-    // Without a prompt event there is nothing to install from here (iOS gets instructions instead).
-    if (!this.deferred && !this.ios) {
-      // Chrome may hold the event back for a while; stop polling after two minutes. If it does
-      // arrive later, onBeforeInstall starts the invitation again.
-      if (Date.now() - this.waitingSince > 120_000) {
-        this.started = false;
+    if (!this.menuReady()) {
+      this.readySince = 0;
+      this.schedule(1200);
+      return;
+    }
+    if (!this.readySince) this.readySince = Date.now();
+
+    // iOS has no install event, so it always gets the share-sheet steps.
+    if (this.ios) {
+      if (Date.now() - this.readySince < 800) {
+        this.schedule(400);
         return;
       }
-      this.schedule(1200);
+      this.show();
       return;
     }
-    if (!this.menuReady()) {
-      this.schedule(1200);
+
+    if (this.deferred) {
+      this.show();
       return;
     }
-    this.show();
+
+    // Android can add a home-screen shortcut through the browser menu even when no PWA prompt is
+    // offered (plain HTTP, in-app browsers, older WebViews). Give the real event a moment first.
+    if (this.android) {
+      if (Date.now() - this.readySince < 5000) {
+        this.schedule(1000);
+        return;
+      }
+      this.show();
+      return;
+    }
+
+    // Desktop: without the event there is no native dialog to open. Wait a while for browsers
+    // that hold it back, then stop polling; onBeforeInstall can start the invitation again.
+    if (Date.now() - this.waitingSince > 120_000) {
+      this.started = false;
+      return;
+    }
+    this.schedule(1200);
   };
 
   private menuReady() {
@@ -216,19 +274,29 @@ class InstallInvitation {
     write(sessionStorage, SHOWN_KEY, '1');
     window.clearTimeout(this.timer);
 
-    if (this.ios) {
-      // Safari has no beforeinstallprompt; walk the player through the share sheet.
-      this.el.classList.add('instructions');
-      this.installBtn?.classList.add('hidden');
-      this.laterBtn?.classList.add('primary');
-      this.laterBtn!.textContent = 'Got it';
-      this.steps?.classList.remove('hidden');
-      this.title!.textContent = 'Put Roadster on your home screen';
-      this.text!.textContent = 'A home-screen app gets the full screen and opens without a signal. Your browser keeps it two taps away.';
+    this.setMode(this.ios ? 'ios' : this.deferred ? 'native' : 'manual');
+    if (!window.isSecureContext) {
+      this.note!.textContent =
+        'This page is on HTTP, so it cannot install as a full offline app. The browser can still add a shortcut; open the HTTPS address for the complete app.';
+      this.note!.classList.remove('hidden');
     }
 
     this.el.classList.remove('hidden');
-    requestAnimationFrame(() => (this.ios ? this.laterBtn : this.installBtn)?.focus());
+    requestAnimationFrame(() => (this.mode === 'native' ? this.installBtn : this.laterBtn)?.focus());
+  }
+
+  /** Native install button, iOS share-sheet steps, or Android browser-menu steps. */
+  private setMode(mode: Mode) {
+    this.mode = mode;
+    const native = mode === 'native';
+    this.el!.classList.toggle('instructions', !native);
+    this.stepsIos!.classList.toggle('hidden', mode !== 'ios');
+    this.stepsAndroid!.classList.toggle('hidden', mode !== 'manual');
+    this.installBtn!.classList.toggle('hidden', !native);
+    this.laterBtn!.classList.toggle('primary', !native);
+    this.laterBtn!.textContent = native ? 'Not now' : 'Got it';
+    this.title!.textContent = native ? DEFAULT_TITLE : MANUAL_TITLE;
+    this.text!.textContent = mode === 'ios' ? IOS_TEXT : mode === 'manual' ? ANDROID_TEXT : DEFAULT_TEXT;
   }
 
   private async install() {

@@ -6,9 +6,11 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:api": "node --test api/_lib/stats.test.js"
   },
   "dependencies": {
+    "@vercel/blob": "^2.9.0",
     "three": "0.170.0"
   },
   "devDependencies": {

@@ -2263,6 +2263,22 @@ body.photo-mode #game:active {
   color: var(--ink);
 }
 
+.install-note {
+  margin: 14px 28px 0;
+  padding: 9px 12px;
+  border-left: 3px solid var(--gold);
+  background: rgba(255, 198, 64, 0.08);
+  font: 500 12px/1.45 var(--font-ui);
+  color: var(--ink-dim);
+}
+
+.menu-dots {
+  width: 14px;
+  height: 14px;
+  vertical-align: -2px;
+  fill: currentColor;
+}
+
 .ios-share {
   width: 14px;
   height: 14px;
@@ -2330,6 +2346,10 @@ body.photo-mode #game:active {
     margin-right: 20px;
   }
   .install-steps {
+    margin-left: 20px;
+    margin-right: 20px;
+  }
+  .install-note {
     margin-left: 20px;
     margin-right: 20px;
   }

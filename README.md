@@ -35,6 +35,13 @@ HTTPS. Browsers decide whether the app is installable, so unsupported ones simpl
 To check installability yourself, run `npm run build && npm run preview`, open the site in Chrome
 and use the install icon in the address bar (or Lighthouse's PWA audit).
 
+**If the invitation doesn't appear on a phone:** check the origin. A phone opening the dev server
+at `http://192.168.x.x:5173` is not a secure origin, so Chrome never fires the install event and
+the service worker cannot register. Deploy over HTTPS (or use a tunnel such as cloudflared) to
+test on a device. Android gets browser-menu steps (`⋮ → Install app` / `Add to Home screen`) when
+the native prompt isn't offered, and iOS gets the Share-sheet steps; both still need HTTPS for the
+full offline app. Firefox on Android does not support PWA installation.
+
 ## Controls
 
 | Action | Keyboard | Touch | Controller |
@@ -77,13 +84,63 @@ player's secret and reject impossible runs. A run must be opened on the server, 
 longer than the real time since it started, and its distance and score must be achievable
 for that time. `supabase/test.sql` exercises all of this against a scratch database.
 
+## Pit wall (Vercel Blob)
+
+`/admin.html` is a separate dashboard for you: active users with approximate location, today /
+yesterday / this week totals, how many people played 2+ and 3+ minutes, average session length,
+top cities, devices, a 7-day visitors chart and the latest sessions. It refreshes every 30 seconds
+and asks for the admin password.
+
+The statistics live in **Vercel Blob** and are served by two Vercel Functions (`/api/track` and
+`/api/admin`). The pit wall does not use Supabase.
+
+1. Deploy the repo to Vercel (the Vite preset builds `dist/`; the `api/` folder becomes functions).
+2. In the Vercel project open **Storage → Blob** and create a store. Connecting it adds
+   `BLOB_READ_WRITE_TOKEN` automatically.
+3. Add `ADMIN_PASSWORD` in **Project Settings → Environment Variables**. Without it the API falls
+   back to `qwertyuiop`; change it before sharing the site.
+4. Open `/admin.html`. Locally use `vercel dev` — plain `npm run dev` serves the game but not the
+   `/api` functions.
+
+If your Blob store is private, set `BLOB_ACCESS=private` as well (the default is public). The page
+is `noindex` and `/admin.html` is disallowed in `robots.txt`; serve the site over HTTPS so the
+password is not sent in clear text.
+
+**How the data is stored** — one JSON blob per browser session at
+`sessions/YYYY-MM/{sessionId}.json`. Each heartbeat read-modify-writes only its own session file,
+using the blob ETag so concurrent beats retry instead of overwriting. The dashboard lists the
+current and previous month, filters to sessions active in the requested periods, and aggregates in
+the function. Blob is object storage, not a database: this is sized for a small game (two blob
+operations per 30-second heartbeat). With much higher traffic, a database or KV store is a better
+fit.
+
+**What it collects** — a random browser id, a per-tab session id, the pilot callsign, visible
+active seconds, parsed device/OS/browser, the page path, and coarse city/region/country looked up
+from the visitor's public IP (`ipwho.is`). It does **not** request GPS and stores no coordinates.
+A new browser or cleared storage counts as a new visitor. Set `VITE_ANALYTICS_OFF=1` in
+`.env.local` (build-time) to turn tracking and the IP lookup off entirely. Do Not Track and Global
+Privacy Control are respected.
+
+The dashboard shows **Yesterday**, not "tomorrow" — future days have no data. "This week" starts
+Monday in your browser's timezone; the browser sends the period boundaries with each request. The
+aggregation is pure and unit-tested with `npm run test:api`.
+
 ## How the code is organized
 
 ```
 index.html            page shell: canvas, HUD, menus and the pilot-name dialog
+admin.html            pit-wall dashboard shell (password gate + stats)
+api/
+  health.js           GET /api/health — Blob configured? password configured?
+  track.js            POST /api/track — public heartbeat, writes one session blob
+  admin.js            POST /api/admin — password-checked aggregation for the pit wall
+  _lib/               shared validation, aggregation maths and Vercel Blob access (+ Node tests)
 src/
   main.ts             entry point: builds the Game, warms it up behind the loading screen, starts the loop
   pwa.ts              service-worker registration and the home-screen install card
+  analytics.ts        anonymous heartbeats and coarse IP location, posted to /api/track
+  admin.ts            pit-wall login, API calls, chart and auto-refresh
+  admin.css           pit-wall styling
   game.ts             the conductor: game states, the per-frame loop, scoring, events, camera
   config.ts           ALL gameplay numbers (speeds, physics, air, points, traffic, items, powers)
   style.css           all HUD and menu styling
@@ -125,8 +182,11 @@ src/
 public/
   manifest.webmanifest  PWA identity, colours and icons
   sw.js                 offline cache for the shell and runtime assets
+  robots.txt            keeps /admin.html out of search indexes
   icons/                flying-car app icon (SVG sources, PNG exports, maskable and iOS sizes)
-supabase/             database schema and tests for the online leaderboard
+supabase/
+  schema.sql            optional online-leaderboard tables and functions
+  test.sql              functional tests for schema.sql
 ```
 
 ### What happens every frame

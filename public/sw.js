@@ -7,7 +7,7 @@
  *
  * Register with ?dev=1 to leave the dev server alone: Vite's module graph must never be cached.
  */
-const VERSION = 'roadster-v1';
+const VERSION = 'roadster-v3';
 const SHELL = `${VERSION}-shell`;
 const RUNTIME = `${VERSION}-runtime`;
 const DEV = new URL(self.location.href).searchParams.has('dev');
@@ -62,6 +62,8 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url);
   if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
+  // Analytics/admin API responses must always be live (and are not part of the app shell).
+  if (url.pathname.startsWith('/api/')) return;
   // Belt and braces: never cache Vite's dev module graph, even if a dev worker slips through.
   if (/^\/(@|src\/|node_modules\/)/.test(url.pathname)) return;
 
@@ -71,7 +73,11 @@ self.addEventListener('fetch', (event) => {
   if (!sameOrigin && !fontHost && !styleHost) return;
 
   if (request.mode === 'navigate') {
-    event.respondWith(networkFirst(request));
+    // Only the game is the cached app shell. /admin.html is a separate page and always goes to
+    // the network, so opening it never overwrites the offline shell with admin HTML.
+    if (url.pathname === '/' || url.pathname === '/index.html') {
+      event.respondWith(networkFirst(request));
+    }
     return;
   }
 

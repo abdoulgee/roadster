@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="theme-color" content="#0d0d12" />
+    <meta name="description" content="Drive Roadster pit wall — live users, locations and playtime." />
+    <title>Pit Wall · Drive Roadster</title>
+    <link rel="icon" type="image/svg+xml" href="/icons/icon.svg" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;1,700;1,800&family=Barlow:wght@500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/src/admin.css" />
+  </head>
+  <body>
+    <header class="admin-top">
+      <a class="brand" href="/">
+        <img src="/icons/icon-192.png" alt="" width="38" height="38" />
+        <span>
+          <b>Drive Roadster</b>
+          <small>Pit wall</small>
+        </span>
+      </a>
+      <div id="top-actions" class="top-actions hidden">
+        <span id="updated" class="updated"></span>
+        <button id="btn-refresh" class="abtn" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5" /></svg>
+          Refresh
+        </button>
+        <button id="btn-signout" class="abtn ghost" type="button">Sign out</button>
+      </div>
+    </header>
+
+    <main class="admin-main">
+      <!-- Vercel Blob is not connected yet (or the local /api functions are not running). -->
+      <section id="setup" class="gate hidden" aria-labelledby="setup-title">
+        <div class="gate-card">
+          <img class="gate-icon" src="/icons/icon-192.png" alt="" width="64" height="64" />
+          <p class="kicker">Setup needed</p>
+          <h1 id="setup-title">Connect the pit wall</h1>
+          <p class="gate-copy">Live stats are stored in Vercel Blob and written through two Vercel Functions.</p>
+          <ol class="setup-steps">
+            <li>In your Vercel project open <b>Storage → Blob</b> and create a store. Connecting it adds <code>BLOB_READ_WRITE_TOKEN</code>.</li>
+            <li>Set <code>ADMIN_PASSWORD</code> in <b>Project Settings → Environment Variables</b>. Without it the API falls back to <code>qwertyuiop</code>.</li>
+            <li>Deploy, or run <code>vercel dev</code> locally. Plain <code>npm run dev</code> serves the game but not <code>/api</code>.</li>
+            <li>Using a private store? Add <code>BLOB_ACCESS=private</code> too (the default is public).</li>
+          </ol>
+          <div class="setup-actions">
+            <button id="btn-setup-retry" class="abtn" type="button">Check again</button>
+            <a class="abtn ghost" href="/">Back to the game</a>
+          </div>
+        </div>
+      </section>
+
+      <!-- Password gate. The check happens inside Postgres, not in this file. -->
+      <section id="gate" class="gate" aria-labelledby="gate-title">
+        <div class="gate-card">
+          <img class="gate-icon" src="/icons/icon-192.png" alt="" width="64" height="64" />
+          <p class="kicker">Drive Roadster</p>
+          <h1 id="gate-title">Pit wall</h1>
+          <p class="gate-copy">Live users, locations and playtime. Password required.</p>
+          <form id="login-form" class="gate-form" novalidate>
+            <input type="text" name="username" autocomplete="username" value="admin" hidden aria-hidden="true" tabindex="-1" />
+            <label for="admin-password">Admin password</label>
+            <input
+              id="admin-password"
+              type="password"
+              autocomplete="current-password"
+              autocapitalize="none"
+              autocorrect="off"
+              spellcheck="false"
+              required
+            />
+            <button id="btn-login" class="abtn primary" type="submit">Open the pit wall</button>
+          </form>
+          <p id="gate-error" class="form-error" role="alert"></p>
+          <p id="password-warning" class="gate-warning hidden" role="note"></p>
+          <p class="gate-note">The password is checked by the server and kept only in this tab. Stats refresh every 30 seconds — open this page over HTTPS.</p>
+        </div>
+      </section>
+
+      <section id="dashboard" class="dashboard hidden" aria-labelledby="dash-title">
+        <header class="dash-head">
+          <div>
+            <p class="kicker">Live overview</p>
+            <h1 id="dash-title">Who's driving</h1>
+          </div>
+          <p id="dash-time" class="dash-time"></p>
+        </header>
+
+        <div id="refresh-error" class="refresh-error hidden" role="status"></div>
+        <p id="config-warning" class="refresh-error hidden" role="status"></p>
+
+        <section class="kpis" aria-label="Key numbers">
+          <article class="kpi live">
+            <p class="kpi-label">Active now</p>
+            <p class="kpi-value" id="kpi-active">0</p>
+            <p class="kpi-sub" id="kpi-active-sub">—</p>
+          </article>
+          <article class="kpi">
+            <p class="kpi-label">Visitors today</p>
+            <p class="kpi-value" id="kpi-visitors">0</p>
+            <p class="kpi-sub" id="kpi-visitors-sub">—</p>
+          </article>
+          <article class="kpi">
+            <p class="kpi-label">Sessions today</p>
+            <p class="kpi-value" id="kpi-sessions">0</p>
+            <p class="kpi-sub" id="kpi-sessions-sub">—</p>
+          </article>
+          <article class="kpi">
+            <p class="kpi-label">Average session</p>
+            <p class="kpi-value" id="kpi-avg">0s</p>
+            <p class="kpi-sub" id="kpi-avg-sub">—</p>
+          </article>
+          <article class="kpi">
+            <p class="kpi-label">Played 2+ minutes</p>
+            <p class="kpi-value" id="kpi-over2">0</p>
+            <p class="kpi-sub" id="kpi-over2-sub">—</p>
+          </article>
+          <article class="kpi">
+            <p class="kpi-label">Played 3+ minutes</p>
+            <p class="kpi-value" id="kpi-over3">0</p>
+            <p class="kpi-sub" id="kpi-over3-sub">—</p>
+          </article>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Today, yesterday and this week</h2>
+              <p>Visitors are distinct browsers; sessions are visits. Times follow your local timezone.</p>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table windows-table">
+              <thead>
+                <tr>
+                  <th scope="col">Period</th>
+                  <th scope="col" class="num">Visitors</th>
+                  <th scope="col" class="num">Sessions</th>
+                  <th scope="col" class="num">New</th>
+                  <th scope="col" class="num">Avg session</th>
+                  <th scope="col" class="num">2m+</th>
+                  <th scope="col" class="num">3m+</th>
+                  <th scope="col" class="num">Time played</th>
+                </tr>
+              </thead>
+              <tbody id="windows-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <div class="dash-grid">
+          <section class="panel chart-panel">
+            <div class="panel-head">
+              <div>
+                <h2>Visitors</h2>
+                <p id="chart-sub">Last 7 days</p>
+              </div>
+            </div>
+            <figure class="chart">
+              <div id="chart-bars" class="chart-bars" role="group" aria-label="Visitors per day, last 7 days"></div>
+              <div id="chart-empty" class="chart-empty hidden">No visits in the last 7 days yet.</div>
+              <figcaption>Hover or focus a bar for visitors, sessions and time played.</figcaption>
+            </figure>
+            <details class="table-view">
+              <summary>Table view</summary>
+              <div class="table-wrap">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Day</th>
+                      <th scope="col" class="num">Visitors</th>
+                      <th scope="col" class="num">Sessions</th>
+                      <th scope="col" class="num">Time played</th>
+                    </tr>
+                  </thead>
+                  <tbody id="daily-body"></tbody>
+                </table>
+              </div>
+            </details>
+          </section>
+
+          <section class="panel live-panel">
+            <div class="panel-head">
+              <div>
+                <h2>Live now</h2>
+                <p id="live-sub">Active in the last 5 minutes</p>
+              </div>
+            </div>
+            <div id="live-list" class="live-list"></div>
+          </section>
+        </div>
+
+        <div class="dash-grid two">
+          <section class="panel">
+            <div class="panel-head">
+              <div>
+                <h2>Top locations</h2>
+                <p>Last 7 days · city-level from IP</p>
+              </div>
+            </div>
+            <div id="locations-list" class="rank-list"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-head">
+              <div>
+                <h2>Devices</h2>
+                <p>Last 7 days · unique visitors</p>
+              </div>
+            </div>
+            <div id="devices-list" class="rank-list"></div>
+          </section>
+        </div>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Recent sessions</h2>
+              <p>Newest activity first · last 50</p>
+            </div>
+          </div>
+          <div class="table-wrap wide">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th scope="col">Pilot</th>
+                  <th scope="col">Location</th>
+                  <th scope="col" class="opt">Device</th>
+                  <th scope="col" class="opt">Started</th>
+                  <th scope="col">Last seen</th>
+                  <th scope="col" class="num">Active</th>
+                </tr>
+              </thead>
+              <tbody id="recent-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <p class="footnote">
+          Location is approximate and derived from the visitor's public IP — no GPS coordinates are stored.
+          Times shown in <span id="tz-label">your timezone</span>. Only this page can read the stats, and only with the password.
+        </p>
+      </section>
+    </main>
+
+    <footer class="admin-foot">
+      <span>Drive Roadster · Pit wall</span>
+      <a href="/">Back to the game</a>
+    </footer>
+
+    <script type="module" src="/src/admin.ts"></script>
+  </body>
+</html>
