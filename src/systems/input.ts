@@ -84,6 +84,12 @@ const DEADZONE = 0.15;
 
 const dead = (v: number) => (Math.abs(v) < DEADZONE ? 0 : (v - Math.sign(v) * DEADZONE) / (1 - DEADZONE));
 
+/** App-level dialogs (currently the install invitation) get the keyboard and pad to themselves. */
+const dialogOwnsInput = () => {
+  const el = document.getElementById('install');
+  return !!el && !el.classList.contains('hidden');
+};
+
 /** Analog controller state, for photo mode's free camera. */
 export interface Analog {
   lx: number;
@@ -121,7 +127,7 @@ export class Input {
     const typing = (e: KeyboardEvent) => e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
     target.addEventListener('keydown', (e) => {
       this.onGesture?.();
-      if (typing(e)) return;
+      if (dialogOwnsInput() || typing(e)) return;
       const actions = KEYMAP[e.code];
       if (!e.repeat && this.trackAdminCode(e.code)) this.pressed.add('adminToggle');
       if (!actions) return;
@@ -156,6 +162,14 @@ export class Input {
    * actions, held buttons hold, and the left stick changes lane with a push to either side.
    */
   pollGamepad() {
+    if (dialogOwnsInput()) {
+      // Let go of whatever the pad was holding so nothing fires when the dialog closes.
+      for (const act of this.padHeld) this.held.delete(act);
+      this.padHeld.clear();
+      this.stickSide = 0;
+      this.stickVert = 0;
+      return;
+    }
     const pads = typeof navigator.getGamepads === 'function' ? navigator.getGamepads() : [];
     let pad: Gamepad | null = null;
     for (const p of pads) {

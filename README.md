@@ -12,6 +12,29 @@ npm run dev      # http://localhost:5173
 npm run build    # production build in dist/
 ```
 
+## Take it home (PWA)
+
+Drive Roadster installs like an app. Once the menu is ready, a card offers to add it to the home
+screen: **Install** opens the browser's own prompt (Chrome, Edge, Android), and the game then has
+its own icon, opens full-screen and starts offline. iOS has no install event, so the card shows
+Share → **Add to Home Screen** instead. "Not now" quiets it for the rest of the visit.
+
+The prompt needs a secure origin: `localhost` is fine in development, a deployed site needs
+HTTPS. Browsers decide whether the app is installable, so unsupported ones simply don't ask.
+
+- `public/manifest.webmanifest` — name, colours, display mode and icons.
+- `public/icons/` — the flying-car artwork (`icon.svg`), rendered to 192/512 px, plus maskable
+  variants and the iOS touch icon. `icon-maskable.svg` recreates the scene inside the safe zone.
+- `public/sw.js` — caches the shell and runtime assets for offline play. It is registered as
+  `?dev=1` during development and caches nothing there, so Vite's module graph stays intact.
+  Bump `VERSION` in `sw.js` when you want to drop old runtime caches after a deploy.
+- `src/pwa.ts` — registers the worker and drives the install card. It waits for the menu (and the
+  first-visit pilot dialog) before showing, ignores input behind the card, and remembers a
+  dismissal for the tab's session.
+
+To check installability yourself, run `npm run build && npm run preview`, open the site in Chrome
+and use the install icon in the address bar (or Lighthouse's PWA audit).
+
 ## Controls
 
 | Action | Keyboard | Touch | Controller |
@@ -60,6 +83,7 @@ for that time. `supabase/test.sql` exercises all of this against a scratch datab
 index.html            page shell: canvas, HUD, menus and the pilot-name dialog
 src/
   main.ts             entry point: builds the Game, warms it up behind the loading screen, starts the loop
+  pwa.ts              service-worker registration and the home-screen install card
   game.ts             the conductor: game states, the per-frame loop, scoring, events, camera
   config.ts           ALL gameplay numbers (speeds, physics, air, points, traffic, items, powers)
   style.css           all HUD and menu styling
@@ -98,6 +122,10 @@ src/
     onlinePanels.ts   pilot-name dialog (first-visit welcome prompt and edit)
   online/             leaderboard backends (device-only / Supabase), callsigns, share links
   util/               math helpers and the seeded random generator
+public/
+  manifest.webmanifest  PWA identity, colours and icons
+  sw.js                 offline cache for the shell and runtime assets
+  icons/                flying-car app icon (SVG sources, PNG exports, maskable and iOS sizes)
 supabase/             database schema and tests for the online leaderboard
 ```
 

@@ -12,3 +12,6 @@ dist
 *.jpeg
 *.webp
 *.gif
+
+# …except the PWA icon set, which ships with the app
+!public/icons/*.png

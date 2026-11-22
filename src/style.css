@@ -2126,6 +2126,278 @@ body.photo-mode #game:active {
   cursor: grabbing;
 }
 
+/* ---------- Home-screen invitation (PWA) ---------- */
+
+/* Sits above the menus but below the toast and the loading screen. */
+#install {
+  z-index: 30;
+  padding:
+    max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+    max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  background: rgba(6, 6, 10, 0.8);
+  backdrop-filter: blur(3px);
+}
+
+.install-card {
+  position: relative;
+  width: min(460px, 100%);
+  padding: 0;
+  overflow: hidden auto;
+  border-color: #33333f;
+  animation: card-in 0.24s ease-out;
+}
+
+/* Livery bar across the top: the accent stripes from the game's signage. */
+.install-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 1;
+  height: 4px;
+  background: repeating-linear-gradient(115deg, var(--accent) 0 11px, transparent 11px 22px);
+  opacity: 0.95;
+}
+
+.install-hero {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  padding: 30px 28px 22px;
+  background:
+    radial-gradient(120% 160% at 88% -10%, rgba(255, 59, 78, 0.3), transparent 58%),
+    linear-gradient(180deg, #1b1220, var(--surface-2));
+  border-bottom: 1px solid var(--line);
+}
+
+.install-icon {
+  flex: none;
+  width: 82px;
+  height: 82px;
+  border-radius: 19px;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.14),
+    0 16px 34px rgba(0, 0, 0, 0.55),
+    0 -8px 28px rgba(255, 59, 78, 0.22);
+  animation: install-float 4.5s ease-in-out infinite;
+}
+
+@keyframes install-float {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: 0 -5px;
+  }
+}
+
+.install-hero > div {
+  min-width: 0;
+  padding-right: 30px;
+}
+
+.install-eyebrow {
+  margin: 0 0 6px;
+  font: 700 11px var(--font-ui);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.install-hero h2 {
+  margin: 0;
+  font: italic 800 clamp(25px, 6vw, 32px) / 0.98 var(--font-display);
+  letter-spacing: 0.005em;
+  text-transform: uppercase;
+}
+
+.install-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 2;
+  background: rgba(13, 13, 18, 0.55);
+}
+
+.install-text {
+  margin: 20px 28px 0;
+  font: 500 14px/1.55 var(--font-ui);
+  color: var(--ink-dim);
+}
+
+.install-steps {
+  counter-reset: install-step;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin: 18px 28px 0;
+  padding: 14px 16px;
+  border-left: 3px solid var(--accent);
+  background: var(--surface-2);
+  list-style: none;
+  font: 500 13.5px/1.4 var(--font-ui);
+  color: var(--ink-dim);
+}
+
+.install-steps li {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  counter-increment: install-step;
+}
+
+.install-steps li::before {
+  content: counter(install-step);
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 19px;
+  height: 19px;
+  border: 1px solid rgba(255, 59, 78, 0.55);
+  border-radius: 50%;
+  font: 700 11px var(--font-ui);
+  color: var(--accent);
+}
+
+.install-steps b {
+  color: var(--ink);
+}
+
+.ios-share {
+  width: 14px;
+  height: 14px;
+  margin: 0 1px;
+  vertical-align: -2px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.install-points {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 20px 28px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.install-points li {
+  min-width: 0;
+  padding: 11px 12px 12px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--surface-2);
+}
+
+.install-points b {
+  display: block;
+  font: italic 700 15px var(--font-display);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.install-points span {
+  display: block;
+  margin-top: 3px;
+  font: 500 11px/1.35 var(--font-ui);
+  color: var(--ink-dim);
+}
+
+.install-actions {
+  padding: 22px 28px 26px;
+  justify-content: flex-end;
+}
+
+.install-actions .btn {
+  min-width: 118px;
+}
+
+@media (max-width: 520px) {
+  .install-hero {
+    gap: 16px;
+    padding: 26px 20px 20px;
+  }
+  .install-icon {
+    width: 68px;
+    height: 68px;
+    border-radius: 16px;
+  }
+  .install-text {
+    margin-left: 20px;
+    margin-right: 20px;
+  }
+  .install-steps {
+    margin-left: 20px;
+    margin-right: 20px;
+  }
+  .install-points {
+    grid-template-columns: 1fr;
+    margin-left: 20px;
+    margin-right: 20px;
+  }
+  .install-points li {
+    display: flex;
+    gap: 10px;
+    align-items: baseline;
+    padding: 9px 12px;
+  }
+  .install-points b {
+    flex: none;
+    width: 84px;
+  }
+  .install-points span {
+    margin-top: 0;
+  }
+  .install-actions {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .install-icon {
+    animation: none;
+  }
+}
+
+/* Very narrow phones: give the title the full width instead of squeezing it beside the icon. */
+@media (max-width: 380px) {
+  .install-hero {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+  }
+  .install-hero > div {
+    padding-right: 34px;
+  }
+  .install-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 15px;
+  }
+}
+
+/* Short windows and landscape phones: drop the three summary chips so the buttons stay in view. */
+@media (max-height: 700px) {
+  .install-hero {
+    padding-top: 22px;
+    padding-bottom: 16px;
+  }
+  .install-text {
+    margin-top: 14px;
+  }
+  .install-points {
+    display: none;
+  }
+  .install-actions {
+    padding-top: 16px;
+    padding-bottom: 18px;
+  }
+}
+
 /* ---------- Toast ---------- */
 
 .toast {
