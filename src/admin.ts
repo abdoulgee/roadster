@@ -105,6 +105,7 @@ const devicesList = byId<HTMLElement>('devices-list');
 const recentBody = byId<HTMLElement>('recent-body');
 const tzLabel = byId<HTMLElement>('tz-label');
 const setupRetry = byId<HTMLButtonElement>('btn-setup-retry');
+const setupDetail = byId<HTMLElement>('setup-detail');
 const passwordWarning = byId<HTMLElement>('password-warning');
 const configWarning = byId<HTMLElement>('config-warning');
 
@@ -615,6 +616,7 @@ function showGate() {
 
 async function boot() {
   gateError.textContent = '';
+  setupDetail.classList.add('hidden');
   try {
     const response = await fetch('/api/health', { cache: 'no-store' });
     if (!response.ok) throw new Error('health');
@@ -624,6 +626,9 @@ async function boot() {
       passwordConfigured?: boolean;
     };
     if (!health.ok || !health.configured) {
+      setupDetail.textContent =
+        'The API is reachable, but this deployment has no Blob store. Connect the store to this project for Production and redeploy. /api/health must return configured:true.';
+      setupDetail.classList.remove('hidden');
       showSetup();
       return;
     }
@@ -638,6 +643,9 @@ async function boot() {
     showGate();
     passwordInput.focus();
   } catch {
+    setupDetail.textContent =
+      'The /api functions are not reachable. Deploy the latest code, or use vercel dev locally.';
+    setupDetail.classList.remove('hidden');
     showSetup();
   }
 }

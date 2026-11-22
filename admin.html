@@ -44,6 +44,7 @@
           <p class="kicker">Setup needed</p>
           <h1 id="setup-title">Connect the pit wall</h1>
           <p class="gate-copy">Live stats are stored in Vercel Blob and written through two Vercel Functions.</p>
+          <p id="setup-detail" class="gate-warning hidden" role="status"></p>
           <ol class="setup-steps">
             <li>In your Vercel project open <b>Storage → Blob</b> and create a store. Connecting it adds <code>BLOB_READ_WRITE_TOKEN</code>.</li>
             <li>Set <code>ADMIN_PASSWORD</code> in <b>Project Settings → Environment Variables</b>. Without it the API falls back to <code>qwertyuiop</code>.</li>
